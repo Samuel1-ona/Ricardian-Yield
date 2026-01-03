@@ -3,13 +3,16 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {PropertyCashFlowSystem} from "../contracts/PropertyCashFlowSystem.sol";
+import {PropertyCashFlowSystemCore} from "../contracts/PropertyCashFlowSystemCore.sol";
+import {SystemInitializer} from "../contracts/SystemInitializer.sol";
 import {MockERC4626Vault} from "../contracts/MockERC4626Vault.sol";
 import {IPropertyNFT} from "../contracts/interfaces/IPropertyNFT.sol";
 import {MockUSDC} from "./MockUSDC.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract SystemInvariants is StdInvariant, Test {
-    PropertyCashFlowSystem public system;
+    PropertyCashFlowSystemCore public system;
+    SystemInitializer public initializer;
     MockUSDC public usdc;
     MockERC4626Vault public mockVault;
     
@@ -21,8 +24,20 @@ contract SystemInvariants is StdInvariant, Test {
     function setUp() public {
         usdc = new MockUSDC();
         
-        vm.prank(owner);
-        system = new PropertyCashFlowSystem(address(usdc), owner);
+        // Deploy implementation
+        PropertyCashFlowSystemCore implementation = new PropertyCashFlowSystemCore();
+        
+        // Deploy proxy
+        bytes memory initData = abi.encodeWithSelector(
+            PropertyCashFlowSystemCore.initializeContract.selector,
+            address(usdc),
+            owner
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
+        system = PropertyCashFlowSystemCore(address(proxy));
+        
+        // Deploy initializer
+        initializer = new SystemInitializer();
 
         IPropertyNFT.PropertyData memory propertyData = IPropertyNFT.PropertyData({
             location: "123 Main St",
@@ -32,16 +47,16 @@ contract SystemInvariants is StdInvariant, Test {
         });
 
         vm.prank(owner);
-        system.initialize(propertyData, 100000 * 1e18, shareholder1);
+        initializer.initializeSystem(system, propertyData, 100000 * 1e18, shareholder1, address(0), 0, 0, true); // Vault set up separately
 
         vm.prank(owner);
-        system.setManager(manager);
+        system.cashFlowEngine().setManager(manager);
         
         vm.prank(owner);
         mockVault = new MockERC4626Vault(usdc, "Mock", "MOCK", owner, 500);
         
         vm.prank(owner);
-        system.setYieldVault(address(mockVault));
+        system.yieldStackingManager().setYieldVault(address(mockVault));
         
         targetContract(address(system));
     }
@@ -55,7 +70,7 @@ contract SystemInvariants is StdInvariant, Test {
 
     /// @notice Invariant: distributable cash flow should never exceed rent collected
     function invariant_DistributableNeverExceedsRent() public view {
-        uint256 distributable = system.getDistributableCashFlow();
+        uint256 distributable = system.cashFlowEngine().getDistributableCashFlow();
         uint256 rentCollected = system.rentVault().rentCollected();
         assertLe(distributable, rentCollected + 1e18); // Small tolerance for yield
     }
@@ -73,30 +88,20 @@ contract SystemInvariants is StdInvariant, Test {
 
     /// @notice Invariant: all contracts should be non-zero
     function invariant_AllContractsNonZero() public view {
-        (
-            address propertyNFT,
-            address propertyShares,
-            address rentVault,
-            address cashFlowEngine,
-            address yieldDistributor,
-            address dao,
-            address yieldStackingManager
-        ) = system.getContracts();
-        
-        assertTrue(propertyNFT != address(0));
-        assertTrue(propertyShares != address(0));
-        assertTrue(rentVault != address(0));
-        assertTrue(cashFlowEngine != address(0));
-        assertTrue(yieldDistributor != address(0));
-        assertTrue(dao != address(0));
-        assertTrue(yieldStackingManager != address(0));
+        assertTrue(address(system.propertyNFT()) != address(0));
+        assertTrue(address(system.propertyShares()) != address(0));
+        assertTrue(address(system.rentVault()) != address(0));
+        assertTrue(address(system.cashFlowEngine()) != address(0));
+        assertTrue(address(system.yieldDistributor()) != address(0));
+        assertTrue(address(system.dao()) != address(0));
+        assertTrue(address(system.yieldStackingManager()) != address(0));
     }
 
     /// @notice Invariant: cash flow from assets should be a valid value
     function invariant_CashFlowFromAssetsFormula() public view {
         // This invariant is complex to verify without exact state knowledge
         // We just verify the function doesn't revert and returns a value
-        try system.getCashFlowFromAssets() returns (int256 cashFlowFromAssets) {
+        try system.cashFlowEngine().getCashFlowFromAssets() returns (int256 cashFlowFromAssets) {
             // Cash flow can be positive or negative (CapEx can exceed distributable)
             // Just verify it's a reasonable value (not extreme)
             assertTrue(cashFlowFromAssets >= type(int256).min / 2);

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./PropertyNFT.sol";
 import "./PropertyShares.sol";
 import "./RentVault.sol";
@@ -15,8 +16,9 @@ import "./interfaces/IPropertyNFT.sol";
  * @title PropertyCashFlowSystem
  * @dev Integration contract that ties all components together
  * Manages initialization and provides convenient access to the entire system
+ * Uses UUPS proxy pattern for upgradeability
  */
-contract PropertyCashFlowSystem is Ownable {
+contract PropertyCashFlowSystem is UUPSUpgradeable, OwnableUpgradeable {
     PropertyNFT public propertyNFT;
     PropertyShares public propertyShares;
     RentVault public rentVault;
@@ -42,8 +44,19 @@ contract PropertyCashFlowSystem is Ownable {
         address dao
     );
 
-    constructor(address _usdc, address initialOwner) Ownable(initialOwner) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Initialize the contract (replaces constructor for upgradeable contracts)
+     * @param _usdc USDC token address
+     * @param initialOwner Initial owner address
+     */
+    function initializeContract(address _usdc, address initialOwner) external initializer {
         require(_usdc != address(0), "PropertyCashFlowSystem: invalid USDC address");
+        __Ownable_init(initialOwner);
         usdc = _usdc;
     }
 
@@ -52,11 +65,19 @@ contract PropertyCashFlowSystem is Ownable {
      * @param propertyData Property metadata
      * @param _totalShares Total number of shares to mint
      * @param initialShareholder Address to receive all initial shares
+     * @param yieldVaultAddress Optional ERC-4626 vault address (can be set later)
+     * @param reserveThreshold Minimum reserve to keep in RentVault (0 = use default)
+     * @param minimumDeposit Minimum amount to deposit (0 = use default)
+     * @param autoDepositEnabled Whether auto-deposit is enabled
      */
     function initialize(
         IPropertyNFT.PropertyData calldata propertyData,
         uint256 _totalShares,
-        address initialShareholder
+        address initialShareholder,
+        address yieldVaultAddress,
+        uint256 reserveThreshold,
+        uint256 minimumDeposit,
+        bool autoDepositEnabled
     ) external onlyOwner {
         require(!initialized, "PropertyCashFlowSystem: already initialized");
         require(_totalShares > 0, "PropertyCashFlowSystem: total shares must be greater than zero");
@@ -96,6 +117,18 @@ contract PropertyCashFlowSystem is Ownable {
         rentVault.setYieldStackingManager(address(yieldStackingManager));
         // Set cash flow engine in yield stacking manager
         yieldStackingManager.setCashFlowEngine(address(cashFlowEngine));
+        
+        // Configure yield vault and parameters if provided
+        if (yieldVaultAddress != address(0)) {
+            yieldStackingManager.setYieldVault(yieldVaultAddress);
+        }
+        if (reserveThreshold > 0) {
+            yieldStackingManager.setReserveThreshold(reserveThreshold);
+        }
+        if (minimumDeposit > 0) {
+            yieldStackingManager.setMinimumDepositAmount(minimumDeposit);
+        }
+        yieldStackingManager.setAutoDepositEnabled(autoDepositEnabled);
 
         initialized = true;
 
@@ -110,155 +143,13 @@ contract PropertyCashFlowSystem is Ownable {
         );
     }
 
-    /**
-     * @dev Set the ERC-4626 vault address for yield stacking
-     * @param vaultAddress Address of the ERC-4626 vault
-     */
-    function setYieldVault(address vaultAddress) external onlyOwner {
-        yieldStackingManager.setYieldVault(vaultAddress);
-    }
+    // Note: View and convenience functions removed to reduce contract size.
+    // Access sub-contracts via public state variables (propertyNFT, propertyShares, etc.)
+    // These functions can be added back in a future upgrade if needed.
 
     /**
-     * @dev Configure yield stacking parameters
-     * @param reserveThreshold Minimum reserve to keep in RentVault
-     * @param minimumDeposit Minimum amount to deposit (gas efficiency)
+     * @dev Required by UUPSUpgradeable - authorizes upgrades
      */
-    function configureYieldStacking(
-        uint256 reserveThreshold,
-        uint256 minimumDeposit
-    ) external onlyOwner {
-        yieldStackingManager.setReserveThreshold(reserveThreshold);
-        yieldStackingManager.setMinimumDepositAmount(minimumDeposit);
-    }
-
-    /**
-     * @dev Toggle auto-deposit on/off
-     */
-    function setAutoDepositEnabled(bool enabled) external onlyOwner {
-        yieldStackingManager.setAutoDepositEnabled(enabled);
-    }
-
-    /**
-     * @dev Get yield earned from DeFi vault
-     */
-    function getYieldEarned() external view returns (uint256) {
-        return yieldStackingManager.getYieldEarned();
-    }
-
-    /**
-     * @dev Get total assets in yield vault
-     */
-    function getTotalAssetsInVault() external view returns (uint256) {
-        return yieldStackingManager.getTotalAssetsInVault();
-    }
-
-    /**
-     * @dev Get all contract addresses
-     */
-    function getContracts() external view returns (
-        address _propertyNFT,
-        address _propertyShares,
-        address _rentVault,
-        address _cashFlowEngine,
-        address _yieldDistributor,
-        address _dao,
-        address _yieldStackingManager
-    ) {
-        return (
-            address(propertyNFT),
-            address(propertyShares),
-            address(rentVault),
-            address(cashFlowEngine),
-            address(yieldDistributor),
-            address(dao),
-            address(yieldStackingManager)
-        );
-    }
-
-    /**
-     * @dev Get property data
-     */
-    function getPropertyData() external view returns (IPropertyNFT.PropertyData memory) {
-        return propertyNFT.getPropertyData(propertyId);
-    }
-
-    /**
-     * @dev Get current distributable cash flow
-     */
-    function getDistributableCashFlow() external view returns (uint256) {
-        return cashFlowEngine.getDistributableCashFlow();
-    }
-
-    /**
-     * @dev Get cash flow from assets
-     */
-    function getCashFlowFromAssets() external view returns (int256) {
-        return cashFlowEngine.getCashFlowFromAssets();
-    }
-
-    /**
-     * @dev Convenience function to deposit rent
-     * Note: Caller must approve USDC to the rent vault, not this contract
-     */
-    function depositRent(uint256 amount) external {
-        // Forward the call - msg.sender will be the one transferring
-        rentVault.depositRent(amount);
-    }
-
-    /**
-     * @dev Convenience function to record operating expense
-     */
-    function recordOperatingExpense(uint256 amount) external {
-        cashFlowEngine.recordOperatingExpense(amount);
-    }
-
-    /**
-     * @dev Convenience function to create CapEx proposal
-     */
-    function createCapExProposal(uint256 amount, string calldata description) external returns (uint256) {
-        return dao.createProposal(amount, description);
-    }
-
-    /**
-     * @dev Convenience function to approve CapEx proposal
-     */
-    function approveCapExProposal(uint256 proposalId) external {
-        dao.approveProposal(proposalId);
-    }
-
-    /**
-     * @dev Convenience function to record CapEx
-     */
-    function recordCapEx(uint256 amount, uint256 proposalId) external {
-        cashFlowEngine.recordCapEx(amount, proposalId);
-    }
-
-    /**
-     * @dev Convenience function to distribute yield
-     */
-    function distributeYield() external {
-        yieldDistributor.distributeYield();
-    }
-
-    /**
-     * @dev Convenience function to claim yield
-     */
-    function claimYield(uint256 period) external {
-        yieldDistributor.claimYield(period);
-    }
-
-    /**
-     * @dev Reset period (calls both rent vault and cash flow engine)
-     */
-    function resetPeriod() external {
-        cashFlowEngine.resetPeriod();
-    }
-
-    /**
-     * @dev Set manager for cash flow engine
-     */
-    function setManager(address manager) external onlyOwner {
-        cashFlowEngine.setManager(manager);
-    }
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
 

@@ -20,7 +20,7 @@ contract Setup is Script {
 
         // Set manager if provided
         if (managerAddress != address(0)) {
-            system.setManager(managerAddress);
+            system.cashFlowEngine().setManager(managerAddress);
             console.log("Manager set to:", managerAddress);
         }
 
