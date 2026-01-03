@@ -8,6 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatCurrency } from "@/lib/utils";
 import { useMounted } from "@/hooks/useMounted";
 
+// Force dynamic rendering - this page depends on wallet state
+export const dynamic = 'force-dynamic';
+
 export default function PropertyPage() {
   const { isConnected } = useAccount();
   const mounted = useMounted();
@@ -67,11 +70,12 @@ export default function PropertyPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-1 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 bg-gray-50 relative pattern-dots">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary/10 to-[#06B6D4]/10 rounded-full blur-3xl"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Property Overview</h1>
-            <p className="text-gray-600">Detailed view of your tokenized property</p>
+            <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Property Overview</h1>
+            <p className="text-gray-600 font-light text-lg">Detailed view of your tokenized property</p>
           </div>
 
           {/* Property Header */}

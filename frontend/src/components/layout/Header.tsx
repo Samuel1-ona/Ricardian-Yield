@@ -1,8 +1,5 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import Image from "next/image";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { formatAddress } from "@/lib/utils";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
@@ -14,7 +11,6 @@ export const Header: React.FC = React.memo(() => {
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Fix hydration mismatch by only showing wallet state after mount
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -35,15 +31,14 @@ export const Header: React.FC = React.memo(() => {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <Link href="/" className="flex items-center space-x-3 group">
+            <Link to="/" className="flex items-center space-x-3 group">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center elevation-2 group-hover:elevation-3 transition-material relative overflow-hidden">
-                <Image
+                <img
                   src="/logo.png"
                   alt="Ricardian Yield Logo"
                   width={40}
                   height={40}
                   className="object-contain rounded-xl"
-                  priority
                 />
               </div>
               <span className="text-xl font-medium text-foreground tracking-tight bg-gradient-to-r from-foreground to-foreground bg-clip-text group-hover:from-primary group-hover:to-[#06B6D4] transition-all">
@@ -57,7 +52,7 @@ export const Header: React.FC = React.memo(() => {
             {navigationLinks.map((link) => (
               <Link
                 key={link.href}
-                href={link.href}
+                to={link.href}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary hover:bg-primary/5 rounded-lg transition-material"
               >
                 {link.label}
@@ -118,7 +113,7 @@ export const Header: React.FC = React.memo(() => {
               {navigationLinks.map((link) => (
                 <Link
                   key={link.href}
-                  href={link.href}
+                  to={link.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className="px-4 py-3 text-sm font-medium text-gray-700 hover:text-primary hover:bg-primary/5 rounded-lg transition-material"
                 >

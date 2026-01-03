@@ -1,6 +1,5 @@
 import React from "react";
-import Link from "next/link";
-import Image from "next/image";
+import { Link } from "react-router-dom";
 
 export const Footer: React.FC = React.memo(() => {
   return (
@@ -8,9 +7,9 @@ export const Footer: React.FC = React.memo(() => {
       <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           <div>
-            <Link href="/" className="flex items-center space-x-3 mb-4 group">
+            <Link to="/" className="flex items-center space-x-3 mb-4 group">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center">
-                <Image
+                <img
                   src="/logo.png"
                   alt="Ricardian Yield Logo"
                   width={40}
@@ -30,12 +29,12 @@ export const Footer: React.FC = React.memo(() => {
             <h4 className="text-sm font-medium text-foreground mb-4 uppercase tracking-wider text-xs">Resources</h4>
             <ul className="space-y-3 text-sm text-gray-600">
               <li>
-                <Link href="/docs" className="hover:text-primary transition-material font-light">
+                <Link to="/docs" className="hover:text-primary transition-material font-light">
                   Documentation
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="hover:text-primary transition-material font-light">
+                <Link to="/about" className="hover:text-primary transition-material font-light">
                   About
                 </Link>
               </li>

@@ -10,6 +10,9 @@ import { formatCurrency } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
 
+// Force dynamic rendering - this page depends on wallet state
+export const dynamic = 'force-dynamic';
+
 export default function YieldPage() {
   const { isConnected } = useAccount();
   const mounted = useMounted();
@@ -97,21 +100,23 @@ export default function YieldPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-1 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 bg-gray-50 relative pattern-grid">
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-[#06B6D4]/10 to-primary/10 rounded-full blur-3xl"></div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Yield Distribution</h1>
-            <p className="text-gray-600">View and claim your proportional yield</p>
+            <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Yield Distribution</h1>
+            <p className="text-gray-600 font-light text-lg">View and claim your proportional yield</p>
           </div>
 
           {/* Total Claimable */}
-          <Card className="mb-8 bg-gradient-to-r from-primary-light to-white border-primary">
-            <CardHeader>
+          <Card className="mb-8 bg-gradient-to-br from-primary/10 via-white to-[#06B6D4]/10 border-0 elevation-2 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/20 to-[#06B6D4]/20 rounded-full blur-2xl"></div>
+            <CardHeader className="relative z-10">
               <CardTitle className="text-2xl">Total Claimable Yield</CardTitle>
               <CardDescription>Available across all periods</CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold text-primary">
+            <CardContent className="relative z-10">
+              <p className="text-4xl font-light text-primary tracking-tight">
                 {formatCurrency(periods.reduce((sum, p) => sum + p.claimable, BigInt(0)))}
               </p>
             </CardContent>

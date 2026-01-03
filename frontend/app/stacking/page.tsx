@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/Button";
 import { formatCurrency } from "@/lib/utils";
 import { useMounted } from "@/hooks/useMounted";
 
+// Force dynamic rendering - this page depends on wallet state
+export const dynamic = 'force-dynamic';
+
 export default function StackingPage() {
   const { isConnected } = useAccount();
   const mounted = useMounted();
@@ -64,22 +67,25 @@ export default function StackingPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-1 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 bg-gray-50 relative pattern-waves">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-[#06B6D4]/15 to-primary/15 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-primary/10 to-[#06B6D4]/10 rounded-full blur-3xl"></div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Yield Stacking</h1>
-            <p className="text-gray-600">Monitor and configure automatic DeFi yield stacking</p>
+            <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Yield Stacking</h1>
+            <p className="text-gray-600 font-light text-lg">Monitor and configure automatic DeFi yield stacking</p>
           </div>
 
           {/* Status Overview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="bg-gradient-to-br from-primary-light to-white border-primary">
-              <CardHeader>
+            <Card className="bg-gradient-to-br from-primary/10 via-white to-[#06B6D4]/10 border-0 elevation-2 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/20 to-[#06B6D4]/20 rounded-full blur-xl"></div>
+              <CardHeader className="relative z-10">
                 <CardTitle className="text-lg">Total Assets in Vault</CardTitle>
                 <CardDescription>Principal + Yield</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-primary">
+              <CardContent className="relative z-10">
+                <p className="text-3xl font-light text-primary tracking-tight">
                   {formatCurrency(stackingData.totalAssetsInVault)}
                 </p>
               </CardContent>

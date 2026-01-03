@@ -10,6 +10,9 @@ import { formatCurrency } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
 
+// Force dynamic rendering - this page depends on wallet state
+export const dynamic = 'force-dynamic';
+
 export default function RentPage() {
   const { address, isConnected } = useAccount();
   const mounted = useMounted();
@@ -68,11 +71,11 @@ export default function RentPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-1 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 bg-gray-50 relative pattern-dots">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Deposit Rent</h1>
-            <p className="text-gray-600">Record a new rent payment</p>
+            <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Deposit Rent</h1>
+            <p className="text-gray-600 font-light text-lg">Record a new rent payment</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

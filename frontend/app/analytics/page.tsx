@@ -1,13 +1,18 @@
 "use client";
 
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { useAccount } from "wagmi";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import { CashFlowChart } from "@/components/charts/CashFlowChart";
-import { YieldChart } from "@/components/charts/YieldChart";
 import { useMounted } from "@/hooks/useMounted";
+
+// Lazy load heavy chart components for faster initial render
+const CashFlowChart = lazy(() => import("@/components/charts/CashFlowChart").then(m => ({ default: m.CashFlowChart })));
+const YieldChart = lazy(() => import("@/components/charts/YieldChart").then(m => ({ default: m.YieldChart })));
+
+// Force dynamic rendering - this page depends on wallet state
+export const dynamic = 'force-dynamic';
 
 export default function AnalyticsPage() {
   const { isConnected } = useAccount();
@@ -69,11 +74,12 @@ export default function AnalyticsPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-1 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 bg-gray-50 relative pattern-dots">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-[#06B6D4]/5"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Analytics & Reports</h1>
-            <p className="text-gray-600">Comprehensive financial analytics and insights</p>
+            <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Analytics & Reports</h1>
+            <p className="text-gray-600 font-light text-lg">Comprehensive financial analytics and insights</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -83,7 +89,9 @@ export default function AnalyticsPage() {
                 <CardDescription>Rent, expenses, and distributable cash flow over time</CardDescription>
               </CardHeader>
               <CardContent>
-                <CashFlowChart data={cashFlowData} />
+                <Suspense fallback={<div className="h-64 flex items-center justify-center text-gray-400">Loading chart...</div>}>
+                  <CashFlowChart data={cashFlowData} />
+                </Suspense>
               </CardContent>
             </Card>
 
@@ -93,7 +101,9 @@ export default function AnalyticsPage() {
                 <CardDescription>Rental yield vs DeFi yield by period</CardDescription>
               </CardHeader>
               <CardContent>
-                <YieldChart data={yieldData} />
+                <Suspense fallback={<div className="h-64 flex items-center justify-center text-gray-400">Loading chart...</div>}>
+                  <YieldChart data={yieldData} />
+                </Suspense>
               </CardContent>
             </Card>
           </div>

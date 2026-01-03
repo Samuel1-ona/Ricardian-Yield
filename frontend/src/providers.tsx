@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig, http } from "wagmi";
@@ -12,8 +10,8 @@ function makeQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 60 * 1000,
-        refetchOnWindowFocus: false, // Prevent unnecessary refetches
-        retry: 1, // Reduce retries for faster failure
+        refetchOnWindowFocus: false,
+        retry: 1,
       },
     },
   });
@@ -30,7 +28,6 @@ function getQueryClient() {
   }
 }
 
-// Memoize config to prevent recreation on every render
 let wagmiConfig: ReturnType<typeof createConfig> | undefined = undefined;
 
 function getWagmiConfig() {
@@ -42,7 +39,7 @@ function getWagmiConfig() {
       ],
       transports: {
         [mantleTestnet.id]: http("https://rpc.testnet.mantle.xyz", {
-          timeout: 10000, // 10 second timeout
+          timeout: 10000,
         }),
       },
     });
@@ -78,4 +75,3 @@ export function Providers({ children }: { children: React.ReactNode }) {
     </WagmiProvider>
   );
 }
-

@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   description: "Where classical economics meets yield stacking. Tokenize rental real estate and maximize returns with automatic DeFi yield stacking.",
 };
 
+// Force dynamic rendering for the entire app
+export const dynamic = 'force-dynamic';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-gray-50`}
       >
         <Providers>
           {children}
