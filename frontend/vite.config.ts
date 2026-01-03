@@ -17,6 +17,21 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React and React Router
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // Web3 libraries (Wagmi, Viem)
+          'web3-vendor': ['wagmi', 'viem', '@tanstack/react-query'],
+          // Chart library (Recharts)
+          'charts-vendor': ['recharts'],
+          // UI utilities
+          'ui-vendor': ['react-hot-toast'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600, // Increase limit slightly since we're splitting
   },
 });
 

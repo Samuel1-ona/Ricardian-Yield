@@ -58,7 +58,7 @@ contract CashFlowEngine is Ownable, ReentrancyGuard {
      */
     function setRentVault(address _rentVault) external onlyOwner {
         require(_rentVault != address(0), "CashFlowEngine: invalid rent vault address");
-        rentVault = RentVault(_rentVault);
+        rentVault = RentVault(payable(_rentVault));
         emit RentVaultSet(_rentVault);
     }
 

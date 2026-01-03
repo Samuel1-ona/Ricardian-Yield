@@ -43,17 +43,14 @@ contract SystemInitializer {
         require(_totalShares > 0, "SystemInitializer: total shares must be greater than zero");
         require(initialShareholder != address(0), "SystemInitializer: invalid shareholder");
 
-        address usdcAddress = system.usdc();
-        
-        // Deploy all contracts
+        // Deploy all contracts (using native MNT, no USDC needed)
         PropertyNFT propertyNFT = new PropertyNFT(address(system));
         PropertyShares propertyShares = new PropertyShares(address(system));
         CashFlowEngine cashFlowEngine = new CashFlowEngine(address(system));
-        RentVault rentVault = new RentVault(usdcAddress, address(system));
+        RentVault rentVault = new RentVault(address(system));
         YieldDistributor yieldDistributor = new YieldDistributor(address(system));
         SimpleDAO dao = new SimpleDAO(address(system));
         YieldStackingManager yieldStackingManager = new YieldStackingManager(
-            usdcAddress,
             address(rentVault),
             address(system)
         );
@@ -74,8 +71,7 @@ contract SystemInitializer {
             address(propertyShares),
             address(cashFlowEngine),
             address(rentVault),
-            address(yieldDistributor),
-            usdcAddress
+            address(yieldDistributor)
         );
         
         // Configure yield vault and parameters (through system contract)

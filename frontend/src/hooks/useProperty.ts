@@ -1,53 +1,26 @@
 import { useReadContract } from "wagmi";
-import { CONTRACT_ADDRESSES } from "@/lib/contracts";
+import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "@/lib/contracts";
 
-// Placeholder ABI - will be replaced with actual contract ABI
-const PROPERTY_CASH_FLOW_SYSTEM_ABI = [
-  {
-    name: "getPropertyData",
-    type: "function",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [
-      {
-        name: "location",
-        type: "string",
-      },
-      {
-        name: "valuation",
-        type: "uint256",
-      },
-      {
-        name: "monthlyRent",
-        type: "uint256",
-      },
-      {
-        name: "metadataURI",
-        type: "string",
-      },
-    ],
-  },
-  {
-    name: "getDistributableCashFlow",
-    type: "function",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    name: "getCashFlowFromAssets",
-    type: "function",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "int256" }],
-  },
-] as const;
+// Get property data from PropertyNFT contract
+// Note: propertyId is needed - get it from the main system contract first
+export function usePropertyData(propertyId?: bigint) {
+  // First, get propertyId from main system if not provided
+  const { data: systemPropertyId } = useReadContract({
+    address: CONTRACT_ADDRESSES.PROPERTY_CASH_FLOW_SYSTEM,
+    abi: CONTRACT_ABIS.PROPERTY_CASH_FLOW_SYSTEM,
+    functionName: "propertyId",
+  });
 
-export function usePropertyData() {
+  const effectivePropertyId = propertyId ?? systemPropertyId;
+
   const { data, isLoading, error } = useReadContract({
-    address: CONTRACT_ADDRESSES.PROPERTY_CASH_FLOW_SYSTEM as `0x${string}`,
-    abi: PROPERTY_CASH_FLOW_SYSTEM_ABI,
+    address: CONTRACT_ADDRESSES.PROPERTY_NFT,
+    abi: CONTRACT_ABIS.PROPERTY_NFT,
     functionName: "getPropertyData",
+    args: effectivePropertyId !== undefined ? [effectivePropertyId] : undefined,
+    query: {
+      enabled: effectivePropertyId !== undefined,
+    },
   });
 
   return {
@@ -57,10 +30,11 @@ export function usePropertyData() {
   };
 }
 
+// Get distributable cash flow from CashFlowEngine
 export function useDistributableCashFlow() {
   const { data, isLoading, error } = useReadContract({
-    address: CONTRACT_ADDRESSES.PROPERTY_CASH_FLOW_SYSTEM as `0x${string}`,
-    abi: PROPERTY_CASH_FLOW_SYSTEM_ABI,
+    address: CONTRACT_ADDRESSES.CASH_FLOW_ENGINE,
+    abi: CONTRACT_ABIS.CASH_FLOW_ENGINE,
     functionName: "getDistributableCashFlow",
   });
 
@@ -71,15 +45,31 @@ export function useDistributableCashFlow() {
   };
 }
 
+// Get cash flow from assets from CashFlowEngine
 export function useCashFlowFromAssets() {
   const { data, isLoading, error } = useReadContract({
-    address: CONTRACT_ADDRESSES.PROPERTY_CASH_FLOW_SYSTEM as `0x${string}`,
-    abi: PROPERTY_CASH_FLOW_SYSTEM_ABI,
+    address: CONTRACT_ADDRESSES.CASH_FLOW_ENGINE,
+    abi: CONTRACT_ABIS.CASH_FLOW_ENGINE,
     functionName: "getCashFlowFromAssets",
   });
 
   return {
     cashFlowFromAssets: data,
+    isLoading,
+    error,
+  };
+}
+
+// Get property ID from main system
+export function usePropertyId() {
+  const { data, isLoading, error } = useReadContract({
+    address: CONTRACT_ADDRESSES.PROPERTY_CASH_FLOW_SYSTEM,
+    abi: CONTRACT_ABIS.PROPERTY_CASH_FLOW_SYSTEM,
+    functionName: "propertyId",
+  });
+
+  return {
+    propertyId: data,
     isLoading,
     error,
   };

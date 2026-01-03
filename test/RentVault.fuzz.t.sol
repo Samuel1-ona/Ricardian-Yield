@@ -14,7 +14,7 @@ contract RentVaultFuzzTest is Test {
     function setUp() public {
         usdc = new MockUSDC();
         vm.prank(owner);
-        rentVault = new RentVault(address(usdc), owner);
+        rentVault = new RentVault(owner);
     }
 
     /// @notice Fuzz test: rent deposits should always increase rentCollected

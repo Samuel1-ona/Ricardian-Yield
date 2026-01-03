@@ -25,10 +25,10 @@ contract YieldStackingManagerInvariants is StdInvariant, Test {
         cashFlowEngine = new CashFlowEngine(owner);
         
         vm.prank(owner);
-        rentVault = new RentVault(address(usdc), owner);
+        rentVault = new RentVault(owner);
         
         vm.prank(owner);
-        yieldManager = new YieldStackingManager(address(usdc), address(rentVault), owner);
+        yieldManager = new YieldStackingManager(address(rentVault), owner);
         
         vm.prank(owner);
         mockVault = new MockERC4626Vault(usdc, "Mock", "MOCK", owner, 500);

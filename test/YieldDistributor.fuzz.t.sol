@@ -27,7 +27,7 @@ contract YieldDistributorFuzzTest is Test {
         cashFlowEngine = new CashFlowEngine(owner);
         
         vm.prank(owner);
-        rentVault = new RentVault(address(usdc), owner);
+        rentVault = new RentVault(owner);
         
         vm.prank(owner);
         propertyShares = new PropertyShares(owner);
@@ -42,8 +42,7 @@ contract YieldDistributorFuzzTest is Test {
         yieldDistributor.initialize(
             address(propertyShares),
             address(cashFlowEngine),
-            address(rentVault),
-            address(usdc)
+            address(rentVault)
         );
         
         vm.prank(owner);

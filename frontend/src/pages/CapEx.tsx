@@ -1,69 +1,38 @@
-import React, { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAccount } from "wagmi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatAddress } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
-
-type ProposalStatus = "pending" | "approved" | "executed";
-
-interface Proposal {
-  id: number;
-  amount: bigint;
-  description: string;
-  status: ProposalStatus;
-  proposer: string;
-  createdAt: string;
-}
+import { useCreateCapExProposal } from "@/hooks/useContractWrite";
+import { useProposalCount, useProposal, useIsProposalApproved } from "@/hooks/useDAO";
 
 export default function CapExPage() {
-  const { isConnected, address } = useAccount();
+  const { isConnected } = useAccount();
   const mounted = useMounted();
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+  
+  // Contract hooks
+  const { createProposal, isPending: isCreating, isConfirming, isConfirmed } = useCreateCapExProposal();
+  const { proposalCount } = useProposalCount();
 
-  // Mock data
-  const proposals: Proposal[] = [
-    {
-      id: 1,
-      amount: BigInt(20000) * BigInt(10) ** BigInt(18),
-      description: "Property renovation - kitchen and bathroom",
-      status: "executed",
-      proposer: "0x1234...5678",
-      createdAt: "2024-01-10",
-    },
-    {
-      id: 2,
-      amount: BigInt(15000) * BigInt(10) ** BigInt(18),
-      description: "Roof replacement",
-      status: "approved",
-      proposer: "0x1234...5678",
-      createdAt: "2024-01-15",
-    },
-    {
-      id: 3,
-      amount: BigInt(10000) * BigInt(10) ** BigInt(18),
-      description: "HVAC system upgrade",
-      status: "pending",
-      proposer: "0x1234...5678",
-      createdAt: "2024-01-20",
-    },
-  ];
+  // Fetch all proposals
+  const proposalIds = useMemo(() => {
+    if (!proposalCount) return [];
+    const count = Number(proposalCount);
+    return Array.from({ length: count }, (_, i) => BigInt(i));
+  }, [proposalCount]);
 
-  const getStatusColor = (status: ProposalStatus) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "approved":
-        return "bg-primary-light text-primary-dark";
-      case "executed":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  // Handle successful proposal creation
+  useEffect(() => {
+    if (isConfirmed) {
+      toast.success("CapEx proposal created successfully!");
+      setAmount("");
+      setDescription("");
     }
-  };
+  }, [isConfirmed]);
 
   const handleCreateProposal = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -82,16 +51,10 @@ export default function CapExPage() {
     }
 
     try {
-      setIsCreating(true);
-      // TODO: Implement actual contract interaction
-      toast.success("CapEx proposal created successfully!");
-      setAmount("");
-      setDescription("");
-    } catch (error) {
-      toast.error("Failed to create proposal");
+      await createProposal(amount, description);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to create proposal");
       console.error(error);
-    } finally {
-      setIsCreating(false);
     }
   };
 
@@ -175,9 +138,9 @@ export default function CapExPage() {
               variant="primary"
               className="w-full"
               onClick={handleCreateProposal}
-              isLoading={isCreating}
+              isLoading={isCreating || isConfirming}
             >
-              Create Proposal
+              {isCreating || isConfirming ? "Creating..." : "Create Proposal"}
             </Button>
           </CardContent>
         </Card>
@@ -186,53 +149,82 @@ export default function CapExPage() {
         <Card>
           <CardHeader>
             <CardTitle>CapEx Proposals</CardTitle>
-            <CardDescription>All capital expenditure proposals</CardDescription>
+            <CardDescription>
+              {proposalCount !== undefined && proposalCount !== null
+                ? `${proposalCount.toString()} proposal(s) total` 
+                : "All capital expenditure proposals"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {proposals.map((proposal) => (
-                <div
-                  key={proposal.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:border-primary transition-colors"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-foreground">Proposal #{proposal.id}</h3>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(proposal.status)}`}
-                        >
-                          {proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}
-                        </span>
-                      </div>
-                      <p className="text-gray-600 mb-2">{proposal.description}</p>
-                      <p className="text-sm text-gray-500">
-                        Proposed by {proposal.proposer} on {proposal.createdAt}
-                      </p>
-                    </div>
-                    <div className="text-right ml-4">
-                      <p className="text-2xl font-bold text-foreground">
-                        {formatCurrency(proposal.amount)}
-                      </p>
-                    </div>
-                  </div>
-                  {proposal.status === "pending" && address && (
-                    <div className="flex gap-2 mt-4">
-                      <Button variant="primary" size="sm">
-                        Approve
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        Reject
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {proposalIds.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">
+                  No proposals created yet. Create one above to get started.
+                </p>
+              ) : (
+                proposalIds.map((proposalId) => (
+                  <ProposalItem key={proposalId.toString()} proposalId={proposalId} />
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
     </main>
+  );
+}
+
+// Component to display a single proposal
+function ProposalItem({ proposalId }: { proposalId: bigint }) {
+  const { proposal, isLoading } = useProposal(proposalId);
+  const { isApproved } = useIsProposalApproved(proposalId);
+
+  if (isLoading) {
+    return (
+      <div className="border border-gray-200 rounded-lg p-4">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!proposal) {
+    return null;
+  }
+
+  const getStatusColor = (approved: boolean | undefined) => {
+    return approved 
+      ? "bg-primary-light text-primary-dark"
+      : "bg-yellow-100 text-yellow-800";
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 hover:border-primary transition-colors">
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="font-semibold text-foreground">Proposal #{proposalId.toString()}</h3>
+            <span
+              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(isApproved)}`}
+            >
+              {isApproved ? "Approved" : "Pending"}
+            </span>
+          </div>
+          <p className="text-gray-600 mb-2">{proposal.description}</p>
+          <p className="text-sm text-gray-500">
+            Proposed by {formatAddress(proposal.proposer)} on{" "}
+            {new Date(Number(proposal.timestamp) * 1000).toLocaleDateString()}
+          </p>
+        </div>
+        <div className="text-right ml-4">
+          <p className="text-2xl font-bold text-foreground">
+            {formatCurrency(proposal.amount)}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 

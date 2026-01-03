@@ -2,8 +2,6 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./RentVault.sol";
@@ -11,19 +9,17 @@ import "./CashFlowEngine.sol";
 
 /**
  * @title YieldStackingManager
- * @dev Manages automatic deposit of idle USDC funds into ERC-4626 vaults
+ * @dev Manages automatic deposit of idle native MNT funds into ERC-4626 vaults
+ * For MVP: Yield stacking is optional (disabled by default) since ERC-4626 requires ERC20 tokens
  * Maintains conservative reserves and tracks yield earned
  */
 contract YieldStackingManager is Ownable, ReentrancyGuard {
-    using SafeERC20 for IERC20;
-
     IERC4626 public yieldVault;
-    IERC20 public usdc;
     RentVault public rentVault;
     CashFlowEngine public cashFlowEngine;
 
     // Reserve management
-    uint256 public reserveThreshold; // Minimum to keep in RentVault (in USDC)
+    uint256 public reserveThreshold; // Minimum to keep in RentVault (in native MNT)
     uint256 public minimumDepositAmount; // Minimum amount to deposit (gas efficiency)
     bool public autoDepositEnabled;
     
@@ -31,7 +27,7 @@ contract YieldStackingManager is Ownable, ReentrancyGuard {
     uint256 public constant WITHDRAWAL_SLIPPAGE_TOLERANCE_BPS = 500; // 5% (500 basis points)
 
     // Tracking
-    uint256 public totalDeposited; // Total USDC deposited to vault (principal only)
+    uint256 public totalDeposited; // Total MNT deposited to vault (principal only)
     uint256 public lastDepositTime;
     mapping(uint256 => uint256) public depositsPerPeriod; // Track deposits per period
 
@@ -55,29 +51,27 @@ contract YieldStackingManager is Ownable, ReentrancyGuard {
     }
 
     constructor(
-        address _usdc,
         address _rentVault,
         address initialOwner
     ) Ownable(initialOwner) {
-        require(_usdc != address(0), "YieldStackingManager: invalid USDC address");
         require(_rentVault != address(0), "YieldStackingManager: invalid rent vault address");
         
-        usdc = IERC20(_usdc);
-        rentVault = RentVault(_rentVault);
+        rentVault = RentVault(payable(_rentVault));
         
-        // Default settings
-        reserveThreshold = 2000 * 1e18; // $2000 default reserve
-        minimumDepositAmount = 1000 * 1e18; // $1000 minimum deposit
-        autoDepositEnabled = true;
+        // Default settings - yield stacking disabled for MVP (requires wrapped MNT or ERC20 vault)
+        reserveThreshold = 2000 * 1e18; // 2000 MNT default reserve
+        minimumDepositAmount = 1000 * 1e18; // 1000 MNT minimum deposit
+        autoDepositEnabled = false; // Disabled by default for MVP (native MNT not compatible with ERC-4626)
     }
 
     /**
-     * @dev Set the ERC-4626 vault address
+     * @dev Set the ERC-4626 vault address (optional - for future use with wrapped MNT)
+     * Note: ERC-4626 vaults require ERC20 tokens, not native tokens
+     * For MVP, this can remain unset (yield stacking disabled)
      */
     function setYieldVault(address _vault) external onlyOwner {
         require(_vault != address(0), "YieldStackingManager: invalid vault address");
-        require(IERC4626(_vault).asset() == address(usdc), "YieldStackingManager: vault asset must be USDC");
-        
+        // Note: For native MNT, would need wrapped MNT (WMNT) or skip yield stacking
         yieldVault = IERC4626(_vault);
         emit YieldVaultSet(_vault);
     }
@@ -142,72 +136,31 @@ contract YieldStackingManager is Ownable, ReentrancyGuard {
     /**
      * @dev Internal function to deposit to vault
      * Includes slippage protection using previewDeposit
+     * Note: For MVP, this requires wrapped MNT or is disabled
      */
     function _depositToVault(uint256 amount) internal {
-        require(usdc.balanceOf(address(rentVault)) >= amount, "YieldStackingManager: insufficient balance");
+        require(address(yieldVault) != address(0), "YieldStackingManager: vault not set");
+        require(address(rentVault).balance >= amount, "YieldStackingManager: insufficient balance");
         
-        // Transfer USDC from rent vault to this contract
+        // Transfer native MNT from rent vault to this contract
         rentVault.withdraw(address(this), amount);
         
-        // Preview expected shares (includes fees, slippage protection)
-        uint256 expectedShares = yieldVault.previewDeposit(amount);
-        require(expectedShares > 0, "YieldStackingManager: zero shares expected");
-        
-        // Approve and deposit to ERC-4626 vault
-        usdc.forceApprove(address(yieldVault), amount);
-        uint256 sharesReceived = yieldVault.deposit(amount, address(this));
-        
-        // Slippage protection: ensure we received at least the expected shares
-        // Note: ERC-4626 spec says deposit should return >= previewDeposit, but we verify for safety
-        require(sharesReceived >= expectedShares, "YieldStackingManager: slippage too high on deposit");
-        
-        totalDeposited += amount;
-        lastDepositTime = block.timestamp;
-        
-        uint256 currentPeriod = rentVault.currentPeriod();
-        depositsPerPeriod[currentPeriod] += amount;
-        
-        emit FundsDeposited(amount, sharesReceived, currentPeriod);
+        // Note: ERC-4626 requires ERC20 tokens, not native tokens
+        // For MVP, this would require wrapping MNT first or using a different mechanism
+        // This function is kept for future compatibility but won't work with native MNT
+        revert("YieldStackingManager: native MNT not compatible with ERC-4626. Use wrapped MNT or disable yield stacking.");
     }
 
     /**
      * @dev Withdraw funds from vault for distribution
-     * @param amount Amount of USDC to withdraw (minimum expected)
-     * Includes slippage protection - reverts if less than requested amount is received
+     * @param amount Amount of MNT to withdraw (minimum expected)
+     * Note: For MVP with native MNT, yield stacking is disabled, so this returns 0
      */
     function withdrawForDistribution(uint256 amount) external onlyAuthorized nonReentrant {
+        // For MVP: Yield stacking disabled with native MNT
+        // This function is kept for future compatibility
         require(address(yieldVault) != address(0), "YieldStackingManager: vault not set");
-        require(amount > 0, "YieldStackingManager: amount must be greater than zero");
-        
-        // Preview expected shares needed (includes fees)
-        uint256 sharesToRedeem = yieldVault.previewWithdraw(amount);
-        uint256 maxRedeem = yieldVault.maxRedeem(address(this));
-        require(sharesToRedeem <= maxRedeem, "YieldStackingManager: insufficient shares");
-        
-        // Redeem shares for USDC
-        uint256 assetsReceived = yieldVault.redeem(sharesToRedeem, address(this), address(this));
-        
-        // Slippage protection: ensure we received at least the requested amount
-        // Note: Due to yield accrual, we might get more than requested, which is fine
-        // We allow a tolerance for fees, rounding differences, and exchange rate variations
-        // This protects against unexpected slippage while being reasonable about vault behavior
-        // Real ERC-4626 vaults should return very close to the requested amount
-        uint256 tolerance = (amount * WITHDRAWAL_SLIPPAGE_TOLERANCE_BPS) / 10000;
-        require(assetsReceived >= (amount - tolerance), "YieldStackingManager: insufficient assets received");
-        
-        // Update tracking (reduce total deposited by the principal portion)
-        // Note: assetsReceived may be more than amount due to yield
-        if (assetsReceived >= amount) {
-            uint256 yieldPortion = assetsReceived - amount;
-            if (yieldPortion > 0) {
-                emit YieldEarned(yieldPortion);
-            }
-        }
-        
-        // Transfer USDC back to rent vault
-        usdc.safeTransfer(address(rentVault), assetsReceived);
-        
-        emit FundsWithdrawn(assetsReceived, sharesToRedeem);
+        revert("YieldStackingManager: native MNT not compatible with ERC-4626. Yield stacking disabled for MVP.");
     }
 
     /**
@@ -215,7 +168,7 @@ contract YieldStackingManager is Ownable, ReentrancyGuard {
      * Idle = total balance - expenses - reserve threshold
      */
     function calculateIdleFunds() public view returns (uint256) {
-        uint256 totalBalance = usdc.balanceOf(address(rentVault));
+        uint256 totalBalance = address(rentVault).balance;
         
         // Get expenses from cash flow engine if available
         uint256 expenses = 0;
@@ -277,16 +230,11 @@ contract YieldStackingManager is Ownable, ReentrancyGuard {
 
     /**
      * @dev Emergency withdraw all funds from vault (owner only)
+     * Note: For MVP with native MNT, this is not applicable
      */
     function emergencyWithdraw() external onlyOwner nonReentrant {
         require(address(yieldVault) != address(0), "YieldStackingManager: vault not set");
-        
-        uint256 shares = yieldVault.balanceOf(address(this));
-        if (shares > 0) {
-            uint256 assets = yieldVault.redeem(shares, address(this), address(this));
-            usdc.safeTransfer(address(rentVault), assets);
-            emit FundsWithdrawn(assets, shares);
-        }
+        revert("YieldStackingManager: native MNT not compatible with ERC-4626. Yield stacking disabled for MVP.");
     }
 }
 

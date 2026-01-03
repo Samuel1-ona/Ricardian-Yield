@@ -32,7 +32,7 @@ contract YieldDistributorTest is Test {
         vm.startPrank(owner);
         propertyNFT = new PropertyNFT(owner);
         propertyShares = new PropertyShares(owner);
-        rentVault = new RentVault(address(usdc), owner);
+        rentVault = new RentVault(owner);
         dao = new SimpleDAO(owner);
         cashFlowEngine = new CashFlowEngine(owner);
         yieldDistributor = new YieldDistributor(owner);
@@ -65,8 +65,7 @@ contract YieldDistributorTest is Test {
         yieldDistributor.initialize(
             address(propertyShares),
             address(cashFlowEngine),
-            address(rentVault),
-            address(usdc)
+            address(rentVault)
         );
         
         // Authorize yield distributor to withdraw from rent vault

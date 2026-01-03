@@ -15,7 +15,7 @@ contract RentVaultInvariants is StdInvariant, Test {
     function setUp() public {
         usdc = new MockUSDC();
         vm.prank(owner);
-        rentVault = new RentVault(address(usdc), owner);
+        rentVault = new RentVault(owner);
         
         // Set up invariant testing
         targetContract(address(rentVault));

@@ -1,0 +1,84 @@
+{
+  "network": "Mantle Sepolia Testnet",
+  "chainId": 5003,
+  "rpcUrl": "https://rpc.sepolia.mantle.xyz",
+  "deploymentDate": "2025-01-03",
+  "tokenType": "Native MNT",
+  "contracts": {
+    "proxy": {
+      "name": "PropertyCashFlowSystem",
+      "address": "0xDDc9E3C9ffCd09465d602febafc96cB756414F2a",
+      "type": "ERC1967Proxy",
+      "description": "Main system proxy address - use this for all interactions"
+    },
+    "implementation": {
+      "name": "PropertyCashFlowSystemCore",
+      "address": "0x469b6fef35461f62788981f437e90ca040939784",
+      "type": "Implementation",
+      "description": "Core implementation contract (upgradeable)"
+    },
+    "propertyNFT": {
+      "name": "PropertyNFT",
+      "address": "0x69178d28943f41e2f477858A13B83cb1315658BC",
+      "type": "ERC721",
+      "description": "Property NFT contract for tokenizing properties"
+    },
+    "propertyShares": {
+      "name": "PropertyShares",
+      "address": "0x519A85E74212D72e096027eDf251131A1f63B018",
+      "type": "ERC20",
+      "description": "Property shares token contract"
+    },
+    "rentVault": {
+      "name": "RentVault",
+      "address": "0x62338a95F800094F7Cb16bCDAe661039b075550D",
+      "type": "Vault",
+      "description": "Vault for collecting and managing rent payments in native MNT"
+    },
+    "cashFlowEngine": {
+      "name": "CashFlowEngine",
+      "address": "0x0C428160b87022f142DdB43B95309B9E083790D2",
+      "type": "Engine",
+      "description": "Engine for calculating and managing cash flow"
+    },
+    "yieldDistributor": {
+      "name": "YieldDistributor",
+      "address": "0xe3E43a8B44b68a40B6eca37c2CC138289095BA1E",
+      "type": "Distributor",
+      "description": "Distributes yield to shareholders in native MNT"
+    },
+    "dao": {
+      "name": "SimpleDAO",
+      "address": "0x44364a9A36540175d9BBcA24769e00aDa5242317",
+      "type": "DAO",
+      "description": "DAO for governance and capital expenditure proposals"
+    },
+    "yieldStackingManager": {
+      "name": "YieldStackingManager",
+      "address": "0x8275a8fC688f0824ec382816Ac35B9691f6E100A",
+      "type": "Manager",
+      "description": "Manages automatic yield stacking (disabled for MVP - native MNT not compatible with ERC-4626)"
+    }
+  },
+  "explorer": {
+    "baseUrl": "https://explorer.sepolia.mantle.xyz/address/",
+    "proxy": "https://explorer.sepolia.mantle.xyz/address/0xDDc9E3C9ffCd09465d602febafc96cB756414F2a",
+    "implementation": "https://explorer.sepolia.mantle.xyz/address/0x469b6fef35461f62788981f437e90ca040939784"
+  },
+  "systemConfig": {
+    "propertyId": 0,
+    "totalShares": "1000000000000000000000000",
+    "yieldStacking": {
+      "enabled": false,
+      "reason": "Native MNT not compatible with ERC-4626 vaults (requires ERC20 tokens)",
+      "reserveThreshold": "2000000000000000000000",
+      "minimumDeposit": "1000000000000000000000"
+    }
+  },
+  "notes": {
+    "tokenType": "Native MNT (Mantle native token)",
+    "decimals": 18,
+    "noApprovalNeeded": true,
+    "yieldStacking": "Disabled for MVP. Can be enabled later with wrapped MNT (WMNT)"
+  }
+}

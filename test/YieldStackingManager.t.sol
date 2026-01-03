@@ -20,16 +20,16 @@ contract YieldStackingManagerTest is Test {
     address public tenant = address(3);
 
     function setUp() public {
-        usdc = new MockUSDC();
+        vm.deal(tenant, 100000 * 1e18); // Give tenant native MNT
         
         vm.prank(owner);
         cashFlowEngine = new CashFlowEngine(owner);
         
         vm.prank(owner);
-        rentVault = new RentVault(address(usdc), owner);
+        rentVault = new RentVault(owner);
         
         vm.prank(owner);
-        yieldManager = new YieldStackingManager(address(usdc), address(rentVault), owner);
+        yieldManager = new YieldStackingManager(address(rentVault), owner);
         
         // Deploy mock vault
         vm.prank(owner);

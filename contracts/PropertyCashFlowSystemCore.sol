@@ -30,7 +30,6 @@ contract PropertyCashFlowSystemCore is UUPSUpgradeable, OwnableUpgradeable {
     // Property configuration
     uint256 public propertyId;
     uint256 public totalShares;
-    address public usdc;
 
     bool public initialized;
 
@@ -51,13 +50,10 @@ contract PropertyCashFlowSystemCore is UUPSUpgradeable, OwnableUpgradeable {
 
     /**
      * @dev Initialize the contract (replaces constructor for upgradeable contracts)
-     * @param _usdc USDC token address
      * @param initialOwner Initial owner address
      */
-    function initializeContract(address _usdc, address initialOwner) external initializer {
-        require(_usdc != address(0), "PropertyCashFlowSystemCore: invalid USDC address");
+    function initializeContract(address initialOwner) external initializer {
         __Ownable_init(initialOwner);
-        usdc = _usdc;
     }
 
     /**
@@ -107,8 +103,7 @@ contract PropertyCashFlowSystemCore is UUPSUpgradeable, OwnableUpgradeable {
         address _propertyShares,
         address _cashFlowEngineAddr,
         address _rentVaultAddr,
-        address _yieldDistributorAddr,
-        address _usdc
+        address _yieldDistributorAddr
     ) external {
         require(!initialized, "PropertyCashFlowSystemCore: already initialized");
         // Allow any caller during initialization (SystemInitializer)
@@ -116,7 +111,7 @@ contract PropertyCashFlowSystemCore is UUPSUpgradeable, OwnableUpgradeable {
         _cashFlowEngine.setDAO(address(_dao));
         _cashFlowEngine.setYieldStackingManager(address(_yieldStackingManager));
         _dao.setCashFlowEngine(_cashFlowEngineAddr);
-        _yieldDistributor.initialize(_propertyShares, _cashFlowEngineAddr, _rentVaultAddr, _usdc);
+        _yieldDistributor.initialize(_propertyShares, _cashFlowEngineAddr, _rentVaultAddr);
         _rentVault.setYieldDistributor(_yieldDistributorAddr);
         _rentVault.setYieldStackingManager(address(_yieldStackingManager));
         _yieldStackingManager.setCashFlowEngine(_cashFlowEngineAddr);

@@ -1,24 +1,93 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatAddress } from "@/lib/utils";
 import { useMounted } from "@/hooks/useMounted";
+import toast from "react-hot-toast";
+import {
+  useYieldEarned,
+  useTotalAssetsInVault,
+  useTotalDeposited,
+  useYieldVaultAddress,
+  useReserveThreshold,
+  useMinimumDepositAmount,
+  useAutoDepositEnabled,
+} from "@/hooks/useYield";
+import {
+  useSetReserveThreshold,
+  useSetMinimumDepositAmount,
+  useSetAutoDepositEnabled,
+} from "@/hooks/useContractWrite";
+import { formatUnits } from "viem";
 
 export default function StackingPage() {
   const { isConnected } = useAccount();
   const mounted = useMounted();
   const [isConfiguring, setIsConfiguring] = useState(false);
+  const [reserveThresholdInput, setReserveThresholdInput] = useState("");
+  const [minimumDepositInput, setMinimumDepositInput] = useState("");
+  const [autoDepositToggle, setAutoDepositToggle] = useState(false);
 
-  // Mock data
-  const stackingData = {
-    totalAssetsInVault: BigInt(15000) * BigInt(10) ** BigInt(18),
-    yieldEarned: BigInt(2500) * BigInt(10) ** BigInt(18),
-    principalDeposited: BigInt(12500) * BigInt(10) ** BigInt(18),
-    reserveThreshold: BigInt(2000) * BigInt(10) ** BigInt(18),
-    minimumDeposit: BigInt(1000) * BigInt(10) ** BigInt(18),
-    autoDepositEnabled: true,
-    vaultAddress: "0x1234...5678",
+  // Contract hooks - read
+  const { totalAssets } = useTotalAssetsInVault();
+  const { yieldEarned } = useYieldEarned();
+  const { totalDeposited } = useTotalDeposited();
+  const { vaultAddress } = useYieldVaultAddress();
+  const { reserveThreshold } = useReserveThreshold();
+  const { minimumDeposit } = useMinimumDepositAmount();
+  const { autoDepositEnabled } = useAutoDepositEnabled();
+
+  // Contract hooks - write
+  const { setReserveThreshold, isPending: isSettingReserve, isConfirmed: reserveSet } = useSetReserveThreshold();
+  const { setMinimumDeposit, isPending: isSettingMinimum, isConfirmed: minimumSet } = useSetMinimumDepositAmount();
+  const { setAutoDeposit, isPending: isSettingAuto, isConfirmed: autoSet } = useSetAutoDepositEnabled();
+
+  // Initialize form values when data loads
+  useEffect(() => {
+    if (reserveThreshold && !reserveThresholdInput) {
+      setReserveThresholdInput(formatUnits(reserveThreshold as bigint, 6));
+    }
+  }, [reserveThreshold, reserveThresholdInput]);
+
+  useEffect(() => {
+    if (minimumDeposit && !minimumDepositInput) {
+      setMinimumDepositInput(formatUnits(minimumDeposit as bigint, 6));
+    }
+  }, [minimumDeposit, minimumDepositInput]);
+
+  useEffect(() => {
+    if (autoDepositEnabled !== undefined) {
+      setAutoDepositToggle(autoDepositEnabled ?? false);
+    }
+  }, [autoDepositEnabled]);
+
+  // Handle successful updates
+  useEffect(() => {
+    if (reserveSet || minimumSet || autoSet) {
+      toast.success("Configuration updated successfully!");
+      setIsConfiguring(false);
+    }
+  }, [reserveSet, minimumSet, autoSet]);
+
+  const handleSaveConfiguration = async () => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    try {
+      if (reserveThresholdInput && parseFloat(reserveThresholdInput) > 0) {
+        await setReserveThreshold(reserveThresholdInput);
+      }
+      if (minimumDepositInput && parseFloat(minimumDepositInput) > 0) {
+        await setMinimumDeposit(minimumDepositInput);
+      }
+      await setAutoDeposit(autoDepositToggle);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update configuration");
+      console.error(error);
+    }
   };
 
   if (!mounted) {
@@ -69,7 +138,7 @@ export default function StackingPage() {
             </CardHeader>
             <CardContent className="relative z-10">
               <p className="text-3xl font-light text-primary tracking-tight">
-                {formatCurrency(stackingData.totalAssetsInVault)}
+                {totalAssets ? formatCurrency(totalAssets as bigint) : "0 USDC"}
               </p>
             </CardContent>
           </Card>
@@ -81,7 +150,7 @@ export default function StackingPage() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-primary">
-                {formatCurrency(stackingData.yieldEarned)}
+                {yieldEarned ? formatCurrency(yieldEarned as bigint) : "0 USDC"}
               </p>
             </CardContent>
           </Card>
@@ -93,7 +162,7 @@ export default function StackingPage() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-foreground">
-                {formatCurrency(stackingData.principalDeposited)}
+                {totalDeposited ? formatCurrency(totalDeposited as bigint) : "0 USDC"}
               </p>
             </CardContent>
           </Card>
@@ -109,33 +178,100 @@ export default function StackingPage() {
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Vault Address</span>
-                <span className="font-mono text-sm text-foreground">{stackingData.vaultAddress}</span>
+                <span className="font-mono text-sm text-foreground">
+                  {vaultAddress ? formatAddress(vaultAddress as `0x${string}`) : "Not set"}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Reserve Threshold</span>
                 <span className="font-semibold text-foreground">
-                  {formatCurrency(stackingData.reserveThreshold)}
+                  {reserveThreshold ? formatCurrency(reserveThreshold as bigint) : "0 USDC"}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Minimum Deposit</span>
                 <span className="font-semibold text-foreground">
-                  {formatCurrency(stackingData.minimumDeposit)}
+                  {minimumDeposit ? formatCurrency(minimumDeposit as bigint) : "0 USDC"}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Auto-Deposit</span>
-                <span className={`font-semibold ${stackingData.autoDepositEnabled ? "text-primary" : "text-gray-500"}`}>
-                  {stackingData.autoDepositEnabled ? "Enabled" : "Disabled"}
+                <span className={`font-semibold ${autoDepositEnabled ? "text-primary" : "text-gray-500"}`}>
+                  {autoDepositEnabled ? "Enabled" : "Disabled"}
                 </span>
               </div>
-              <Button
-                variant="outline"
-                className="w-full mt-4"
-                onClick={() => setIsConfiguring(true)}
-              >
-                Configure Settings
-              </Button>
+              {!isConfiguring ? (
+                <Button
+                  variant="outline"
+                  className="w-full mt-4"
+                  onClick={() => setIsConfiguring(true)}
+                >
+                  Configure Settings
+                </Button>
+              ) : (
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Reserve Threshold (USDC)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={reserveThresholdInput}
+                      onChange={(e) => setReserveThresholdInput(e.target.value)}
+                      placeholder="2000.00"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Minimum Deposit (USDC)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={minimumDepositInput}
+                      onChange={(e) => setMinimumDepositInput(e.target.value)}
+                      placeholder="1000.00"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Auto-Deposit Enabled</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoDepositToggle}
+                        onChange={(e) => setAutoDepositToggle(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="primary"
+                      className="flex-1"
+                      onClick={handleSaveConfiguration}
+                      isLoading={isSettingReserve || isSettingMinimum || isSettingAuto}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setIsConfiguring(false);
+                        setReserveThresholdInput(reserveThreshold ? formatUnits(reserveThreshold as bigint, 6) : "");
+                        setMinimumDepositInput(minimumDeposit ? formatUnits(minimumDeposit as bigint, 6) : "");
+                        setAutoDepositToggle(autoDepositEnabled ?? false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

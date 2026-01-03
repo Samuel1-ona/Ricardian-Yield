@@ -1,45 +1,46 @@
-import React, { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAccount } from "wagmi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { formatCurrency, formatAddress } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
+import { useCreateCapExProposal, useApproveProposal } from "@/hooks/useContractWrite";
+import { useProposalCount, useProposal, useIsProposalApproved } from "@/hooks/useDAO";
 
 export default function DAOPage() {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const mounted = useMounted();
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+  
+  // Contract hooks
+  const { createProposal, isPending: isCreating, isConfirming: isCreatingConfirming, isConfirmed: isCreated } = useCreateCapExProposal();
+  const { approveProposal, isPending: isApproving, isConfirming: isApprovingConfirming, isConfirmed: isApproved } = useApproveProposal();
+  const { proposalCount } = useProposalCount();
 
-  // Mock data - will be replaced with actual contract calls
-  const proposals = [
-    {
-      id: 1,
-      amount: BigInt(50000) * BigInt(10) ** BigInt(18),
-      description: "Roof replacement and repair",
-      proposer: "0x1234...5678",
-      timestamp: Date.now() - 86400000 * 2, // 2 days ago
-      approved: false,
-    },
-    {
-      id: 2,
-      amount: BigInt(30000) * BigInt(10) ** BigInt(18),
-      description: "HVAC system upgrade",
-      proposer: "0xabcd...efgh",
-      timestamp: Date.now() - 86400000 * 5, // 5 days ago
-      approved: true,
-    },
-    {
-      id: 3,
-      amount: BigInt(20000) * BigInt(10) ** BigInt(18),
-      description: "Parking lot resurfacing",
-      proposer: "0x9876...5432",
-      timestamp: Date.now() - 86400000 * 7, // 7 days ago
-      approved: false,
-    },
-  ];
+  // Fetch all proposals
+  const proposalIds = useMemo(() => {
+    if (!proposalCount) return [];
+    const count = Number(proposalCount);
+    return Array.from({ length: count }, (_, i) => BigInt(i));
+  }, [proposalCount]);
+
+  // Handle successful proposal creation
+  useEffect(() => {
+    if (isCreated) {
+      toast.success("Proposal created successfully!");
+      setAmount("");
+      setDescription("");
+    }
+  }, [isCreated]);
+
+  // Handle successful proposal approval
+  useEffect(() => {
+    if (isApproved) {
+      toast.success("Proposal approved!");
+    }
+  }, [isApproved]);
 
   const handleCreateProposal = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -58,30 +59,23 @@ export default function DAOPage() {
     }
 
     try {
-      setIsCreating(true);
-      // TODO: Implement actual contract interaction
-      toast.success("Proposal created successfully!");
-      setAmount("");
-      setDescription("");
-    } catch (error) {
-      toast.error("Failed to create proposal");
+      await createProposal(amount, description);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to create proposal");
       console.error(error);
-    } finally {
-      setIsCreating(false);
     }
   };
 
-  const handleApproveProposal = async (proposalId: number) => {
+  const handleApproveProposal = async (proposalId: bigint) => {
     if (!isConnected) {
       toast.error("Please connect your wallet");
       return;
     }
 
     try {
-      // TODO: Implement actual contract interaction
-      toast.success("Proposal approved!");
-    } catch (error) {
-      toast.error("Failed to approve proposal");
+      await approveProposal(proposalId);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to approve proposal");
       console.error(error);
     }
   };
@@ -130,7 +124,9 @@ export default function DAOPage() {
               <CardDescription>All time</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-foreground">{proposals.length}</p>
+              <p className="text-3xl font-bold text-foreground">
+                {proposalCount !== undefined && proposalCount !== null ? proposalCount.toString() : "0"}
+              </p>
             </CardContent>
           </Card>
 
@@ -141,7 +137,7 @@ export default function DAOPage() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-primary">
-                {proposals.filter(p => !p.approved).length}
+                {proposalIds.length > 0 ? "Check below" : "0"}
               </p>
             </CardContent>
           </Card>
@@ -149,11 +145,11 @@ export default function DAOPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Approved Proposals</CardTitle>
-              <CardDescription>Executed</CardDescription>
+              <CardDescription>Approved</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-primary">
-                {proposals.filter(p => p.approved).length}
+                {proposalIds.length > 0 ? "Check below" : "0"}
               </p>
             </CardContent>
           </Card>
@@ -202,9 +198,9 @@ export default function DAOPage() {
                 variant="primary"
                 className="w-full"
                 onClick={handleCreateProposal}
-                isLoading={isCreating}
+                isLoading={isCreating || isCreatingConfirming}
               >
-                Create Proposal
+                {isCreating || isCreatingConfirming ? "Creating..." : "Create Proposal"}
               </Button>
             </CardContent>
           </Card>
@@ -213,61 +209,107 @@ export default function DAOPage() {
           <Card>
             <CardHeader>
               <CardTitle>Active Proposals</CardTitle>
-              <CardDescription>Recent CapEx proposals</CardDescription>
+              <CardDescription>
+                {proposalCount !== undefined && proposalCount !== null
+                  ? `${proposalCount.toString()} proposal(s) total` 
+                  : "Recent CapEx proposals"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                {proposals.map((proposal) => (
-                  <div
-                    key={proposal.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:border-primary/50 transition-material"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-medium text-foreground">Proposal #{proposal.id}</h3>
-                          {proposal.approved ? (
-                            <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
-                              Approved
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
-                              Pending
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 mb-2">{proposal.description}</p>
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span>Proposer: {formatAddress(proposal.proposer)}</span>
-                          <span>
-                            {new Date(proposal.timestamp).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-primary text-lg">
-                          {formatCurrency(proposal.amount)}
-                        </p>
-                      </div>
-                    </div>
-                    {!proposal.approved && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full mt-3"
-                        onClick={() => handleApproveProposal(proposal.id)}
-                      >
-                        Approve Proposal
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                {proposalIds.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">
+                    No proposals created yet. Create one above to get started.
+                  </p>
+                ) : (
+                  proposalIds.map((proposalId) => (
+                    <ProposalItem 
+                      key={proposalId.toString()} 
+                      proposalId={proposalId}
+                      onApprove={handleApproveProposal}
+                      isApproving={isApproving || isApprovingConfirming}
+                    />
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
     </main>
+  );
+}
+
+// Component to display a single proposal
+function ProposalItem({ 
+  proposalId, 
+  onApprove,
+  isApproving 
+}: { 
+  proposalId: bigint;
+  onApprove: (id: bigint) => void;
+  isApproving: boolean;
+}) {
+  const { proposal, isLoading } = useProposal(proposalId);
+  const { isApproved } = useIsProposalApproved(proposalId);
+
+  if (isLoading) {
+    return (
+      <div className="border border-gray-200 rounded-lg p-4">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!proposal) {
+    return null;
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 hover:border-primary/50 transition-material">
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-medium text-foreground">Proposal #{proposalId.toString()}</h3>
+            {isApproved ? (
+              <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
+                Approved
+              </span>
+            ) : (
+              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                Pending
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-600 mb-2">{proposal.description}</p>
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            <span>Proposer: {formatAddress(proposal.proposer)}</span>
+            <span>
+              {new Date(Number(proposal.timestamp) * 1000).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="font-semibold text-primary text-lg">
+            {formatCurrency(proposal.amount)}
+          </p>
+        </div>
+      </div>
+      {!isApproved && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full mt-3"
+          onClick={() => onApprove(proposalId)}
+          isLoading={isApproving}
+        >
+          {isApproving ? "Approving..." : "Approve Proposal"}
+        </Button>
+      )}
+    </div>
   );
 }
 

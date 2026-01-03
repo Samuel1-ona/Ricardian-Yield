@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./PropertyShares.sol";
@@ -12,16 +10,13 @@ import "./YieldStackingManager.sol";
 
 /**
  * @title YieldDistributor
- * @dev Distributes yield proportionally to token holders
+ * @dev Distributes yield proportionally to token holders using native MNT
  * Uses snapshot mechanism for fair distribution and claimable pattern for gas efficiency
  */
 contract YieldDistributor is Ownable, ReentrancyGuard {
-    using SafeERC20 for IERC20;
-
     PropertyShares public propertyShares;
     CashFlowEngine public cashFlowEngine;
     RentVault public rentVault;
-    IERC20 public usdc;
 
     // Snapshot-based distribution
     uint256 public currentDistributionPeriod;
@@ -41,18 +36,15 @@ contract YieldDistributor is Ownable, ReentrancyGuard {
     function initialize(
         address _propertyShares,
         address _cashFlowEngine,
-        address _rentVault,
-        address _usdc
+        address _rentVault
     ) external onlyOwner {
         require(_propertyShares != address(0), "YieldDistributor: invalid property shares address");
         require(_cashFlowEngine != address(0), "YieldDistributor: invalid cash flow engine address");
         require(_rentVault != address(0), "YieldDistributor: invalid rent vault address");
-        require(_usdc != address(0), "YieldDistributor: invalid USDC address");
 
         propertyShares = PropertyShares(_propertyShares);
         cashFlowEngine = CashFlowEngine(_cashFlowEngine);
-        rentVault = RentVault(_rentVault);
-        usdc = IERC20(_usdc);
+        rentVault = RentVault(payable(_rentVault));
     }
 
     /**
@@ -110,13 +102,14 @@ contract YieldDistributor is Ownable, ReentrancyGuard {
         // Calculate proportional yield
         uint256 yieldAmount = (totalDistributablePerPeriod[period] * userBalance) / totalSupply;
         require(yieldAmount > 0, "YieldDistributor: yield amount too small");
-        require(usdc.balanceOf(address(this)) >= yieldAmount, "YieldDistributor: insufficient funds");
+        require(address(this).balance >= yieldAmount, "YieldDistributor: insufficient funds");
 
         // Mark as claimed
         claimedPerPeriod[period][msg.sender] = yieldAmount;
 
-        // Transfer yield
-        usdc.safeTransfer(msg.sender, yieldAmount);
+        // Transfer native MNT yield
+        (bool success, ) = payable(msg.sender).call{value: yieldAmount}("");
+        require(success, "YieldDistributor: transfer failed");
 
         emit YieldClaimed(msg.sender, period, yieldAmount);
     }
@@ -170,7 +163,9 @@ contract YieldDistributor is Ownable, ReentrancyGuard {
      */
     function emergencyWithdraw(address to, uint256 amount) external onlyOwner {
         require(to != address(0), "YieldDistributor: invalid recipient");
-        usdc.safeTransfer(to, amount);
+        require(address(this).balance >= amount, "YieldDistributor: insufficient balance");
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success, "YieldDistributor: transfer failed");
     }
 }
 

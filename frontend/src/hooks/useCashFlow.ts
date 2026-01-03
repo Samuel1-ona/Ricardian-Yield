@@ -1,49 +1,26 @@
 import { useReadContract } from "wagmi";
-import { CONTRACT_ADDRESSES } from "@/lib/contracts";
+import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "@/lib/contracts";
 
-// Placeholder ABI - will be replaced with actual contract ABI
-const CASH_FLOW_ENGINE_ABI = [
-  {
-    name: "operatingExpenses",
-    type: "function",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    name: "capexSpent",
-    type: "function",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    name: "workingCapitalReserve",
-    type: "function",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-] as const;
-
+// Get operating expenses from CashFlowEngine
 export function useOperatingExpenses() {
   const { data, isLoading, error } = useReadContract({
-    address: CONTRACT_ADDRESSES.PROPERTY_CASH_FLOW_SYSTEM as `0x${string}`,
-    abi: CASH_FLOW_ENGINE_ABI,
+    address: CONTRACT_ADDRESSES.CASH_FLOW_ENGINE,
+    abi: CONTRACT_ABIS.CASH_FLOW_ENGINE,
     functionName: "operatingExpenses",
   });
 
   return {
-    operatingExpenses: data,
+    operatingExpenses: data as bigint | undefined,
     isLoading,
     error,
   };
 }
 
+// Get CapEx spent from CashFlowEngine
 export function useCapExSpent() {
   const { data, isLoading, error } = useReadContract({
-    address: CONTRACT_ADDRESSES.PROPERTY_CASH_FLOW_SYSTEM as `0x${string}`,
-    abi: CASH_FLOW_ENGINE_ABI,
+    address: CONTRACT_ADDRESSES.CASH_FLOW_ENGINE,
+    abi: CONTRACT_ABIS.CASH_FLOW_ENGINE,
     functionName: "capexSpent",
   });
 
@@ -54,15 +31,80 @@ export function useCapExSpent() {
   };
 }
 
+// Get working capital reserve from CashFlowEngine
 export function useWorkingCapitalReserve() {
   const { data, isLoading, error } = useReadContract({
-    address: CONTRACT_ADDRESSES.PROPERTY_CASH_FLOW_SYSTEM as `0x${string}`,
-    abi: CASH_FLOW_ENGINE_ABI,
+    address: CONTRACT_ADDRESSES.CASH_FLOW_ENGINE,
+    abi: CONTRACT_ABIS.CASH_FLOW_ENGINE,
     functionName: "workingCapitalReserve",
   });
 
   return {
-    workingCapitalReserve: data,
+    workingCapitalReserve: data as bigint | undefined,
+    isLoading,
+    error,
+  };
+}
+
+// Get rent collected from RentVault
+export function useRentCollected() {
+  const { data, isLoading, error } = useReadContract({
+    address: CONTRACT_ADDRESSES.RENT_VAULT,
+    abi: CONTRACT_ABIS.RENT_VAULT,
+    functionName: "rentCollected",
+  });
+
+  return {
+    rentCollected: data as bigint | undefined,
+    isLoading,
+    error,
+  };
+}
+
+// Get current period from CashFlowEngine
+export function useCurrentPeriod() {
+  const { data, isLoading, error } = useReadContract({
+    address: CONTRACT_ADDRESSES.CASH_FLOW_ENGINE,
+    abi: CONTRACT_ABIS.CASH_FLOW_ENGINE,
+    functionName: "getCurrentPeriod",
+  });
+
+  return {
+    currentPeriod: data as bigint | undefined,
+    isLoading,
+    error,
+  };
+}
+
+// Get rent for a specific period from RentVault
+export function useRentForPeriod(period: bigint | undefined) {
+  const { data, isLoading, error } = useReadContract({
+    address: CONTRACT_ADDRESSES.RENT_VAULT,
+    abi: CONTRACT_ABIS.RENT_VAULT,
+    functionName: "getRentForPeriod",
+    args: period !== undefined ? [period] : undefined,
+    query: {
+      enabled: period !== undefined,
+    },
+  });
+
+  return {
+    rentForPeriod: data,
+    isLoading,
+    error,
+  };
+}
+
+// Get current period from RentVault
+export function useRentVaultCurrentPeriod() {
+  const { data, isLoading, error } = useReadContract({
+    address: CONTRACT_ADDRESSES.RENT_VAULT,
+    abi: CONTRACT_ABIS.RENT_VAULT,
+    functionName: "currentPeriod",
+  });
+
+  return {
+    currentPeriod: data,
     isLoading,
     error,
   };

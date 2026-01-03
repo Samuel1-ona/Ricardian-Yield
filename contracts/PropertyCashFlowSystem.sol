@@ -30,7 +30,6 @@ contract PropertyCashFlowSystem is UUPSUpgradeable, OwnableUpgradeable {
     // Property configuration
     uint256 public propertyId;
     uint256 public totalShares;
-    address public usdc;
 
     bool public initialized;
 
@@ -51,13 +50,10 @@ contract PropertyCashFlowSystem is UUPSUpgradeable, OwnableUpgradeable {
 
     /**
      * @dev Initialize the contract (replaces constructor for upgradeable contracts)
-     * @param _usdc USDC token address
      * @param initialOwner Initial owner address
      */
-    function initializeContract(address _usdc, address initialOwner) external initializer {
-        require(_usdc != address(0), "PropertyCashFlowSystem: invalid USDC address");
+    function initializeContract(address initialOwner) external initializer {
         __Ownable_init(initialOwner);
-        usdc = _usdc;
     }
 
     /**
@@ -88,10 +84,10 @@ contract PropertyCashFlowSystem is UUPSUpgradeable, OwnableUpgradeable {
         propertyShares = new PropertyShares(address(this));
         cashFlowEngine = new CashFlowEngine(address(this));
         // Create rentVault with this contract as owner initially (we'll transfer ownership if needed)
-        rentVault = new RentVault(usdc, address(this));
+        rentVault = new RentVault(address(this));
         yieldDistributor = new YieldDistributor(address(this));
         dao = new SimpleDAO(address(this));
-        yieldStackingManager = new YieldStackingManager(usdc, address(rentVault), address(this));
+        yieldStackingManager = new YieldStackingManager(address(rentVault), address(this));
 
         // Mint property NFT to owner (system contract doesn't need to hold it)
         propertyId = propertyNFT.mintProperty(owner(), propertyData);
@@ -108,8 +104,7 @@ contract PropertyCashFlowSystem is UUPSUpgradeable, OwnableUpgradeable {
         yieldDistributor.initialize(
             address(propertyShares),
             address(cashFlowEngine),
-            address(rentVault),
-            usdc
+            address(rentVault)
         );
         // Authorize yield distributor to withdraw from rent vault
         rentVault.setYieldDistributor(address(yieldDistributor));

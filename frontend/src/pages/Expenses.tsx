@@ -1,27 +1,37 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { formatCurrency } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
+import { useRecordOperatingExpense } from "@/hooks/useContractWrite";
+import { 
+  useOperatingExpenses, 
+  useWorkingCapitalReserve,
+  useCurrentPeriod 
+} from "@/hooks/useCashFlow";
 
 export default function ExpensesPage() {
   const { isConnected } = useAccount();
   const mounted = useMounted();
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Contract hooks
+  const { recordExpense, isPending: isRecording, isConfirming, isConfirmed } = useRecordOperatingExpense();
+  const { operatingExpenses } = useOperatingExpenses();
+  const { workingCapitalReserve } = useWorkingCapitalReserve();
+  const { currentPeriod } = useCurrentPeriod();
 
-  // Mock data
-  const expenses = [
-    { id: 1, amount: BigInt(5000) * BigInt(10) ** BigInt(18), description: "Property maintenance", date: "2024-01-10" },
-    { id: 2, amount: BigInt(3000) * BigInt(10) ** BigInt(18), description: "Insurance premium", date: "2024-01-05" },
-    { id: 3, amount: BigInt(2000) * BigInt(10) ** BigInt(18), description: "Property taxes", date: "2024-01-01" },
-  ];
-
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, BigInt(0));
-  const workingCapitalReserve = BigInt(5000) * BigInt(10) ** BigInt(18);
+  // Handle successful expense recording
+  useEffect(() => {
+    if (isConfirmed) {
+      toast.success("Expense recorded successfully!");
+      setAmount("");
+      setDescription("");
+    }
+  }, [isConfirmed]);
 
   const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -40,16 +50,10 @@ export default function ExpensesPage() {
     }
 
     try {
-      setIsSubmitting(true);
-      // TODO: Implement actual contract interaction
-      toast.success("Expense recorded successfully!");
-      setAmount("");
-      setDescription("");
-    } catch (error) {
-      toast.error("Failed to record expense");
+      await recordExpense(amount);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to record expense");
       console.error(error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -93,10 +97,14 @@ export default function ExpensesPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Total Expenses</CardTitle>
-              <CardDescription>Current period</CardDescription>
+              <CardDescription>
+                {currentPeriod !== undefined && currentPeriod !== null ? `Period ${currentPeriod.toString()}` : "Current period"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-red-500">{formatCurrency(totalExpenses)}</p>
+              <p className="text-3xl font-bold text-red-500">
+                {operatingExpenses ? formatCurrency(operatingExpenses as bigint) : "0 USDC"}
+              </p>
             </CardContent>
           </Card>
 
@@ -106,17 +114,21 @@ export default function ExpensesPage() {
               <CardDescription>Safety buffer</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-foreground">{formatCurrency(workingCapitalReserve)}</p>
+              <p className="text-3xl font-bold text-foreground">
+                {workingCapitalReserve ? formatCurrency(workingCapitalReserve as bigint) : "0 USDC"}
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Expense Count</CardTitle>
-              <CardDescription>This period</CardDescription>
+              <CardTitle className="text-lg">Current Period</CardTitle>
+              <CardDescription>Active period</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-foreground">{expenses.length}</p>
+              <p className="text-3xl font-bold text-foreground">
+                {currentPeriod !== undefined && currentPeriod !== null ? currentPeriod.toString() : "-"}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -158,9 +170,9 @@ export default function ExpensesPage() {
                 variant="primary"
                 className="w-full"
                 onClick={handleSubmit}
-                isLoading={isSubmitting}
+                isLoading={isRecording || isConfirming}
               >
-                Record Expense
+                {isRecording || isConfirming ? "Recording..." : "Record Expense"}
               </Button>
             </CardContent>
           </Card>
@@ -168,22 +180,36 @@ export default function ExpensesPage() {
           {/* Expense History */}
           <Card>
             <CardHeader>
-              <CardTitle>Expense History</CardTitle>
-              <CardDescription>Recent operating expenses</CardDescription>
+              <CardTitle>Expense Summary</CardTitle>
+              <CardDescription>
+                {currentPeriod !== undefined 
+                  ? `Total expenses for period ${currentPeriod !== null ? currentPeriod.toString() : ""}` 
+                  : "Current period expenses"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {expenses.map((expense) => (
-                  <div key={expense.id} className="border-b border-gray-200 pb-4 last:border-0">
+                {operatingExpenses !== undefined && (operatingExpenses as bigint) > BigInt(0) ? (
+                  <div className="border-b border-gray-200 pb-4">
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <p className="font-medium text-foreground">{expense.description}</p>
-                        <p className="text-sm text-gray-500">{expense.date}</p>
+                        <p className="font-medium text-foreground">Total Operating Expenses</p>
+                        <p className="text-sm text-gray-500">
+                          {currentPeriod !== undefined 
+                            ? `Period ${currentPeriod !== null ? currentPeriod.toString() : ""}` 
+                            : "Current period"}
+                        </p>
                       </div>
-                      <p className="font-semibold text-red-500">{formatCurrency(expense.amount)}</p>
+                      <p className="font-semibold text-red-500">
+                        {formatCurrency(operatingExpenses as bigint)}
+                      </p>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  <p className="text-gray-500 text-sm text-center py-4">
+                    No expenses recorded for this period yet.
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

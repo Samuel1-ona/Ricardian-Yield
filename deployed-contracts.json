@@ -2,90 +2,84 @@
   "network": "Mantle Sepolia Testnet",
   "chainId": 5003,
   "rpcUrl": "https://rpc.sepolia.mantle.xyz",
-  "deploymentDate": "2024",
+  "deploymentDate": "2025-01-03",
+  "tokenType": "Native MNT",
   "contracts": {
     "proxy": {
       "name": "PropertyCashFlowSystem",
-      "address": "0x9BEdAB8212aacd9Cc379C7E2c014bC1fC31bb045",
+      "address": "0xDDc9E3C9ffCd09465d602febafc96cB756414F2a",
       "type": "ERC1967Proxy",
       "description": "Main system proxy address - use this for all interactions"
     },
     "implementation": {
       "name": "PropertyCashFlowSystemCore",
-      "address": "0x1da0742bEAA2f80F6215b11f24cE97d2f2f7eDbd",
+      "address": "0x469b6fef35461f62788981f437e90ca040939784",
       "type": "Implementation",
-      "description": "Core implementation contract"
+      "description": "Core implementation contract (upgradeable)"
     },
     "propertyNFT": {
       "name": "PropertyNFT",
-      "address": "0x7Fe1dcfa5C8c8e5c8872f2E141913db0109DCEe6",
+      "address": "0x69178d28943f41e2f477858A13B83cb1315658BC",
       "type": "ERC721",
       "description": "Property NFT contract for tokenizing properties"
     },
     "propertyShares": {
       "name": "PropertyShares",
-      "address": "0x7C5ac5b389Bc0Bd2269157fD89fcBF9f93c52891",
+      "address": "0x519A85E74212D72e096027eDf251131A1f63B018",
       "type": "ERC20",
       "description": "Property shares token contract"
     },
     "rentVault": {
       "name": "RentVault",
-      "address": "0xB9a61B47fcb0ec8a8211B32Dacf7d81f5cd60EA1",
+      "address": "0x62338a95F800094F7Cb16bCDAe661039b075550D",
       "type": "Vault",
-      "description": "Vault for collecting and managing rent payments"
+      "description": "Vault for collecting and managing rent payments in native MNT"
     },
     "cashFlowEngine": {
       "name": "CashFlowEngine",
-      "address": "0xc8840c490F1a5DEcbe50A7BEca8590805103F2d9",
+      "address": "0x0C428160b87022f142DdB43B95309B9E083790D2",
       "type": "Engine",
       "description": "Engine for calculating and managing cash flow"
     },
     "yieldDistributor": {
       "name": "YieldDistributor",
-      "address": "0x3399387bdAbf72bE32A78d17D7AED3F0d1cC673f",
+      "address": "0xe3E43a8B44b68a40B6eca37c2CC138289095BA1E",
       "type": "Distributor",
-      "description": "Distributes yield to shareholders"
+      "description": "Distributes yield to shareholders in native MNT"
     },
     "dao": {
       "name": "SimpleDAO",
-      "address": "0xD67fa0B702A0fd81E9Be2A1715e2ca51566c1e8A",
+      "address": "0x44364a9A36540175d9BBcA24769e00aDa5242317",
       "type": "DAO",
       "description": "DAO for governance and capital expenditure proposals"
     },
     "yieldStackingManager": {
       "name": "YieldStackingManager",
-      "address": "0x2D66BDFefF5683639cE0c408E06E57E6BED16E86",
+      "address": "0x8275a8fC688f0824ec382816Ac35B9691f6E100A",
       "type": "Manager",
-      "description": "Manages automatic yield stacking into ERC-4626 vaults"
-    },
-    "mockERC4626Vault": {
-      "name": "MockERC4626Vault",
-      "address": "0x120ce065c9Ae4743f2c7C01D7b4A76D57923e40D",
-      "type": "ERC4626",
-      "description": "Mock ERC-4626 vault for testing yield stacking"
-    }
-  },
-  "externalContracts": {
-    "usdc": {
-      "name": "USDC",
-      "address": "0xAcab8129E2cE587fD203FD770ec9ECAFA2C88080",
-      "type": "ERC20",
-      "description": "Real USDC token on Mantle Sepolia testnet"
+      "description": "Manages automatic yield stacking (disabled for MVP - native MNT not compatible with ERC-4626)"
     }
   },
   "explorer": {
     "baseUrl": "https://explorer.sepolia.mantle.xyz/address/",
-    "proxy": "https://explorer.sepolia.mantle.xyz/address/0x9BEdAB8212aacd9Cc379C7E2c014bC1fC31bb045",
-    "implementation": "https://explorer.sepolia.mantle.xyz/address/0x1da0742bEAA2f80F6215b11f24cE97d2f2f7eDbd"
+    "proxy": "https://explorer.sepolia.mantle.xyz/address/0xDDc9E3C9ffCd09465d602febafc96cB756414F2a",
+    "implementation": "https://explorer.sepolia.mantle.xyz/address/0x469b6fef35461f62788981f437e90ca040939784"
   },
   "systemConfig": {
     "propertyId": 0,
     "totalShares": "1000000000000000000000000",
     "yieldStacking": {
+      "enabled": false,
+      "reason": "Native MNT not compatible with ERC-4626 vaults (requires ERC20 tokens)",
       "reserveThreshold": "2000000000000000000000",
-      "minimumDeposit": "1000000000000000000000",
-      "autoDepositEnabled": true
+      "minimumDeposit": "1000000000000000000000"
     }
+  },
+  "notes": {
+    "tokenType": "Native MNT (Mantle native token)",
+    "decimals": 18,
+    "noApprovalNeeded": true,
+    "yieldStacking": "Disabled for MVP. Can be enabled later with wrapped MNT (WMNT)"
   }
 }
 

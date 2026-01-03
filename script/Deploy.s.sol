@@ -11,24 +11,18 @@ import {YieldDistributor} from "../contracts/YieldDistributor.sol";
 import {SimpleDAO} from "../contracts/SimpleDAO.sol";
 import {YieldStackingManager} from "../contracts/YieldStackingManager.sol";
 import {IPropertyNFT} from "../contracts/interfaces/IPropertyNFT.sol";
-import {MockUSDC} from "../test/MockUSDC.sol";
-import {MockERC4626Vault} from "../contracts/MockERC4626Vault.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+// Removed USDC and ERC-4626 imports - using native MNT for MVP
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title Deploy
  * @dev Deployment script for Mantle Sepolia testnet
  * 
- * Supports both real and mock contracts:
- * - If USDC_ADDRESS is set, uses real USDC (otherwise deploys MockUSDC)
- * - If ERC4626_VAULT_ADDRESS is set, uses real ERC-4626 vault (otherwise deploys MockERC4626Vault)
+ * Uses native MNT (Mantle native token) instead of USDC
+ * Yield stacking is disabled for MVP (ERC-4626 requires ERC20 tokens, not native tokens)
  * 
  * Environment variables:
  * - PRIVATE_KEY: Deployer private key
- * - USDC_ADDRESS (optional): Real USDC token address on Mantle Sepolia
- * - ERC4626_VAULT_ADDRESS (optional): Real ERC-4626 vault address
  */
 contract Deploy is Script {
     function run() external {
@@ -44,44 +38,10 @@ contract Deploy is Script {
         
         vm.startBroadcast(deployerPrivateKey);
 
-        // Step 1: Get or deploy USDC
-        address usdcAddress;
-        bool usingRealUSDC = false;
-        try vm.envAddress("USDC_ADDRESS") returns (address existingUSDC) {
-            usdcAddress = existingUSDC;
-            usingRealUSDC = true;
-            console.log("Using REAL USDC at:", usdcAddress);
-        } catch {
-            console.log("USDC_ADDRESS not set, deploying MockUSDC...");
-            MockUSDC mockUSDC = new MockUSDC();
-            usdcAddress = address(mockUSDC);
-            console.log("MockUSDC deployed at:", usdcAddress);
-        }
-
-        // Step 2: Get or deploy ERC-4626 Vault
-        address yieldVaultAddress;
-        bool usingRealVault = false;
-        try vm.envAddress("ERC4626_VAULT_ADDRESS") returns (address existingVault) {
-            yieldVaultAddress = existingVault;
-            usingRealVault = true;
-            console.log("Using REAL ERC-4626 Vault at:", yieldVaultAddress);
-            
-            // Verify it's a valid ERC-4626 vault
-            IERC4626 vault = IERC4626(yieldVaultAddress);
-            require(vault.asset() == usdcAddress, "Vault asset must match USDC address");
-            console.log("Vault verified - asset matches USDC");
-        } catch {
-            console.log("ERC4626_VAULT_ADDRESS not set, deploying MockERC4626Vault...");
-            MockERC4626Vault mockVault = new MockERC4626Vault(
-                IERC20(usdcAddress),
-                "Ricardian Yield Vault",
-                "RYV",
-                deployer,
-                500 // 5% APY initial yield rate
-            );
-            yieldVaultAddress = address(mockVault);
-            console.log("MockERC4626Vault deployed at:", yieldVaultAddress);
-        }
+        // Note: For MVP, we're using native MNT instead of USDC
+        // Yield stacking is disabled by default (ERC-4626 requires ERC20 tokens, not native tokens)
+        address yieldVaultAddress = address(0); // Disabled for MVP
+        console.log("Using native MNT - yield stacking disabled for MVP");
 
         // Step 3: Deploy the implementation contract
         console.log("Deploying PropertyCashFlowSystemCore implementation...");
@@ -92,7 +52,6 @@ contract Deploy is Script {
         console.log("Deploying UUPS Proxy...");
         bytes memory initData = abi.encodeWithSelector(
             PropertyCashFlowSystemCore.initializeContract.selector,
-            usdcAddress,
             deployer
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
@@ -112,15 +71,14 @@ contract Deploy is Script {
         uint256 totalShares = 1000000 * 1e18; // 1M shares
 
         console.log("Deploying sub-contracts...");
-        // Deploy all sub-contracts
+        // Deploy all sub-contracts (using native MNT, no USDC needed)
         PropertyNFT propertyNFT = new PropertyNFT(address(system));
         PropertyShares propertyShares = new PropertyShares(address(system));
         CashFlowEngine cashFlowEngine = new CashFlowEngine(address(system));
-        RentVault rentVault = new RentVault(usdcAddress, address(system));
+        RentVault rentVault = new RentVault(address(system));
         YieldDistributor yieldDistributor = new YieldDistributor(address(system));
         SimpleDAO dao = new SimpleDAO(address(system));
         YieldStackingManager yieldStackingManager = new YieldStackingManager(
-            usdcAddress,
             address(rentVault),
             address(system)
         );
@@ -142,17 +100,17 @@ contract Deploy is Script {
             address(propertyShares),
             address(cashFlowEngine),
             address(rentVault),
-            address(yieldDistributor),
-            usdcAddress
+            address(yieldDistributor)
         );
 
         // Configure yield stacking (through system contract)
+        // For MVP: Yield stacking disabled (native MNT not compatible with ERC-4626)
         system.configureYieldStacking(
             yieldStackingManager,
-            yieldVaultAddress,
-            2000 * 1e18, // $2k reserve threshold
-            1000 * 1e18, // $1k minimum deposit
-            true // auto-deposit enabled
+            address(0), // No vault (disabled for MVP)
+            2000 * 1e18, // 2000 MNT reserve threshold
+            1000 * 1e18, // 1000 MNT minimum deposit
+            false // auto-deposit disabled for MVP
         );
 
         // Set all contract addresses
@@ -175,18 +133,8 @@ contract Deploy is Script {
         // Step 7: Get all contract addresses (via public state variables)
 
         console.log("\n=== Deployment Summary ===");
-        console.log("USDC Token:", usdcAddress);
-        if (usingRealUSDC) {
-            console.log("  -> Using REAL USDC");
-        } else {
-            console.log("  -> Using MockUSDC (for testing)");
-        }
-        console.log("Yield Vault:", yieldVaultAddress);
-        if (usingRealVault) {
-            console.log("  -> Using REAL ERC-4626 Vault");
-        } else {
-            console.log("  -> Using MockERC4626Vault (for testing)");
-        }
+        console.log("Native Token: MNT (Mantle native token)");
+        console.log("Yield Vault: Disabled (native MNT not compatible with ERC-4626)");
         console.log("PropertyCashFlowSystem (Proxy):", address(system));
         console.log("  -> This is the address to use for all interactions");
         console.log("Implementation:", address(implementation));

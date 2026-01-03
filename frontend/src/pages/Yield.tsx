@@ -1,43 +1,62 @@
-import React, { useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useAccount } from "wagmi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { formatCurrency } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
+import { useClaimYield } from "@/hooks/useContractWrite";
+import { 
+  useClaimableYield, 
+  useCurrentDistributionPeriod,
+  useTotalDistributablePerPeriod 
+} from "@/hooks/useYield";
+import { useYieldEarned } from "@/hooks/useYield";
 
 export default function YieldPage() {
   const { isConnected } = useAccount();
   const mounted = useMounted();
-  const [selectedPeriod, setSelectedPeriod] = useState<number | null>(null);
+  const { claimYield, isPending: isClaiming, isConfirming, isConfirmed } = useClaimYield();
+  const { currentPeriod } = useCurrentDistributionPeriod();
+  const { yieldEarned } = useYieldEarned();
 
-  // Mock data
-  const periods = [
-    {
-      period: 3,
-      distributable: BigInt(35000) * BigInt(10) ** BigInt(18),
-      rentalYield: BigInt(30000) * BigInt(10) ** BigInt(18),
-      defiYield: BigInt(5000) * BigInt(10) ** BigInt(18),
-      claimable: BigInt(3500) * BigInt(10) ** BigInt(18),
-      claimed: false,
-    },
-    {
-      period: 2,
-      distributable: BigInt(32000) * BigInt(10) ** BigInt(18),
-      rentalYield: BigInt(28000) * BigInt(10) ** BigInt(18),
-      defiYield: BigInt(4000) * BigInt(10) ** BigInt(18),
-      claimable: BigInt(0),
-      claimed: true,
-    },
-    {
-      period: 1,
-      distributable: BigInt(30000) * BigInt(10) ** BigInt(18),
-      rentalYield: BigInt(30000) * BigInt(10) ** BigInt(18),
-      defiYield: BigInt(0),
-      claimable: BigInt(0),
-      claimed: true,
-    },
-  ];
+  // Fetch claimable yield for current period
+  const { claimableYield: currentClaimable } = useClaimableYield(
+    currentPeriod !== undefined && currentPeriod !== null ? currentPeriod : undefined
+  );
+  
+  // Fetch total distributable for current period
+  const { totalDistributable: currentTotal } = useTotalDistributablePerPeriod(
+    currentPeriod !== undefined && currentPeriod !== null ? currentPeriod : BigInt(0)
+  );
+
+  // For simplicity, show current period data
+  // In a production app, you'd want to fetch multiple periods separately
+  const periodData = useMemo(() => {
+    if (!currentPeriod || currentPeriod === null) return [];
+    
+    const claimable = (currentClaimable as bigint | undefined) || BigInt(0);
+    const total = (currentTotal as bigint | undefined) || BigInt(0);
+    
+    return [{
+      period: Number(currentPeriod),
+      claimable,
+      totalDistributable: total,
+      claimed: claimable === BigInt(0) && total > BigInt(0),
+    }];
+  }, [currentPeriod, currentClaimable, currentTotal]);
+
+  // Calculate total claimable across all periods
+  const totalClaimable = useMemo(() => {
+    return periodData.reduce((sum, p) => sum + p.claimable, BigInt(0));
+  }, [periodData]);
+
+  // Handle successful claim
+  useEffect(() => {
+    if (isConfirmed) {
+      toast.success("Yield claimed successfully!");
+    }
+  }, [isConfirmed]);
 
   const handleClaim = async (period: number) => {
     if (!isConnected) {
@@ -46,10 +65,9 @@ export default function YieldPage() {
     }
 
     try {
-      // TODO: Implement actual contract interaction
-      toast.success(`Yield for period ${period} claimed successfully!`);
-    } catch (error) {
-      toast.error("Failed to claim yield");
+      await claimYield(BigInt(period));
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to claim yield");
       console.error(error);
     }
   };
@@ -100,63 +118,74 @@ export default function YieldPage() {
           </CardHeader>
           <CardContent className="relative z-10">
             <p className="text-4xl font-light text-primary tracking-tight">
-              {formatCurrency(periods.reduce((sum, p) => sum + p.claimable, BigInt(0)))}
+              {formatCurrency(totalClaimable)}
             </p>
+            {(yieldEarned as bigint | undefined) && (yieldEarned as bigint) > BigInt(0) && (
+              <p className="text-sm text-gray-600 mt-2">
+                DeFi Yield Earned: {formatCurrency(yieldEarned as bigint)}
+              </p>
+            )}
           </CardContent>
         </Card>
 
         {/* Periods List */}
         <div className="space-y-4">
-          {periods.map((periodData) => (
-            <Card key={periodData.period} hover>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>Period {periodData.period}</CardTitle>
-                    <CardDescription>
-                      {periodData.claimed ? "Claimed" : "Available to claim"}
-                    </CardDescription>
-                  </div>
-                  {!periodData.claimed && periodData.claimable > BigInt(0) && (
-                    <Button
-                      variant="primary"
-                      onClick={() => handleClaim(periodData.period)}
-                    >
-                      Claim Yield
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Total Distributable</p>
-                    <p className="text-lg font-semibold text-foreground">
-                      {formatCurrency(periodData.distributable)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Rental Yield</p>
-                    <p className="text-lg font-semibold text-primary">
-                      {formatCurrency(periodData.rentalYield)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">DeFi Yield</p>
-                    <p className="text-lg font-semibold text-primary">
-                      {formatCurrency(periodData.defiYield)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Your Claimable</p>
-                    <p className="text-lg font-semibold text-primary">
-                      {formatCurrency(periodData.claimable)}
-                    </p>
-                  </div>
-                </div>
+          {periodData.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <p className="text-gray-500">No distribution periods available yet.</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  Yield will appear here after distributions are made.
+                </p>
               </CardContent>
             </Card>
-          ))}
+          ) : (
+            periodData.map((pd) => (
+              <Card key={pd.period} hover>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Period {pd.period}</CardTitle>
+                      <CardDescription>
+                        {pd.claimed ? "Claimed" : (pd.claimable as bigint) > BigInt(0) ? "Available to claim" : "No claimable yield"}
+                      </CardDescription>
+                    </div>
+                    {!pd.claimed && (pd.claimable as bigint) > BigInt(0) && (
+                      <Button
+                        variant="primary"
+                        onClick={() => handleClaim(pd.period)}
+                        isLoading={isClaiming || isConfirming}
+                      >
+                        {isClaiming || isConfirming ? "Claiming..." : "Claim Yield"}
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Total Distributable</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        {formatCurrency(pd.totalDistributable as bigint)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Your Claimable</p>
+                      <p className="text-lg font-semibold text-primary">
+                        {formatCurrency(pd.claimable as bigint)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Status</p>
+                      <p className={`text-lg font-semibold ${pd.claimed ? "text-gray-500" : (pd.claimable as bigint) > BigInt(0) ? "text-primary" : "text-gray-400"}`}>
+                        {pd.claimed ? "Claimed" : (pd.claimable as bigint) > BigInt(0) ? "Available" : "No yield"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
     </main>

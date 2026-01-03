@@ -24,7 +24,7 @@ contract CashFlowEngineInvariants is StdInvariant, Test {
         cashFlowEngine = new CashFlowEngine(owner);
         
         vm.prank(owner);
-        rentVault = new RentVault(address(usdc), owner);
+        rentVault = new RentVault(owner);
         
         vm.prank(owner);
         dao = new SimpleDAO(owner);

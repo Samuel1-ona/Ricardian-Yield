@@ -24,7 +24,7 @@ contract CashFlowEngineTest is Test {
         
         // Create rentVault with cashFlowEngine as owner so it can call resetPeriod
         vm.prank(owner);
-        rentVault = new RentVault(address(usdc), address(cashFlowEngine));
+        rentVault = new RentVault(address(cashFlowEngine));
         
         vm.prank(owner);
         dao = new SimpleDAO(owner);

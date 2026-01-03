@@ -1,20 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title RentVault
- * @dev Receives and holds rental income in USDC
+ * @dev Receives and holds rental income in native MNT
  * Tracks rent collected per period (monthly) for cash flow calculations
  */
 contract RentVault is Ownable, ReentrancyGuard {
-    using SafeERC20 for IERC20;
-
-    IERC20 public immutable usdc;
     uint256 public rentCollected;
     uint256 public currentPeriod;
     mapping(uint256 => uint256) public rentPerPeriod;
@@ -24,19 +19,16 @@ contract RentVault is Ownable, ReentrancyGuard {
     event RentDeposited(address indexed depositor, uint256 amount, uint256 period);
     event PeriodReset(uint256 newPeriod);
 
-    constructor(address _usdc, address initialOwner) Ownable(initialOwner) {
-        require(_usdc != address(0), "RentVault: invalid USDC address");
-        usdc = IERC20(_usdc);
-    }
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     /**
-     * @dev Deposit rent payment (anyone can call - tenant or property manager)
-     * @param amount Amount of USDC to deposit
+     * @dev Deposit rent payment using native MNT (anyone can call - tenant or property manager)
+     * @param amount Amount of MNT to deposit (must match msg.value)
      */
-    function depositRent(uint256 amount) external nonReentrant {
+    function depositRent(uint256 amount) external payable nonReentrant {
         require(amount > 0, "RentVault: amount must be greater than zero");
+        require(msg.value == amount, "RentVault: amount must match msg.value");
         
-        usdc.safeTransferFrom(msg.sender, address(this), amount);
         rentCollected += amount;
         rentPerPeriod[currentPeriod] += amount;
 
@@ -63,10 +55,10 @@ contract RentVault is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Get total USDC balance in the vault
+     * @dev Get total native MNT balance in the vault
      */
     function getBalance() external view returns (uint256) {
-        return usdc.balanceOf(address(this));
+        return address(this).balance;
     }
 
     /**
@@ -86,7 +78,7 @@ contract RentVault is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Withdraw USDC from vault (only owner, yield distributor, or yield stacking manager)
+     * @dev Withdraw native MNT from vault (only owner, yield distributor, or yield stacking manager)
      * @param to Address to withdraw to
      * @param amount Amount to withdraw
      */
@@ -99,7 +91,20 @@ contract RentVault is Ownable, ReentrancyGuard {
         );
         require(to != address(0), "RentVault: invalid recipient");
         require(amount > 0, "RentVault: amount must be greater than zero");
-        usdc.safeTransfer(to, amount);
+        require(address(this).balance >= amount, "RentVault: insufficient balance");
+        
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success, "RentVault: transfer failed");
+    }
+
+    /**
+     * @dev Receive function to accept native MNT
+     */
+    receive() external payable {
+        // Allow direct MNT transfers
+        rentCollected += msg.value;
+        rentPerPeriod[currentPeriod] += msg.value;
+        emit RentDeposited(msg.sender, msg.value, currentPeriod);
     }
 }
 

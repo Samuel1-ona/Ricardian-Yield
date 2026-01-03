@@ -3,35 +3,27 @@ pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
 import {RentVault} from "../contracts/RentVault.sol";
-import {MockUSDC} from "./MockUSDC.sol";
 
 contract RentVaultTest is Test {
     RentVault public rentVault;
-    MockUSDC public usdc;
     address public owner = address(1);
     address public tenant = address(2);
 
     function setUp() public {
-        usdc = new MockUSDC();
+        vm.deal(tenant, 100000 * 1e18); // Give tenant native MNT
         vm.prank(owner);
-        rentVault = new RentVault(address(usdc), owner);
-        
-        // Give tenant some USDC
-        usdc.mint(tenant, 100000 * 1e18);
+        rentVault = new RentVault(owner);
     }
 
     function testDepositRent() public {
         uint256 amount = 5000 * 1e18;
         
         vm.prank(tenant);
-        usdc.approve(address(rentVault), amount);
-        
-        vm.prank(tenant);
-        rentVault.depositRent(amount);
+        rentVault.depositRent{value: amount}(amount);
 
         assertEq(rentVault.rentCollected(), amount);
         assertEq(rentVault.getRentForPeriod(0), amount);
-        assertEq(usdc.balanceOf(address(rentVault)), amount);
+        assertEq(address(rentVault).balance, amount);
     }
 
     function testDepositRentMultipleTimes() public {
@@ -39,9 +31,8 @@ contract RentVaultTest is Test {
         uint256 amount2 = 2000 * 1e18;
         
         vm.startPrank(tenant);
-        usdc.approve(address(rentVault), amount1 + amount2);
-        rentVault.depositRent(amount1);
-        rentVault.depositRent(amount2);
+        rentVault.depositRent{value: amount1}(amount1);
+        rentVault.depositRent{value: amount2}(amount2);
         vm.stopPrank();
 
         assertEq(rentVault.rentCollected(), amount1 + amount2);
@@ -51,15 +42,14 @@ contract RentVaultTest is Test {
     function testDepositRentFailsWithZeroAmount() public {
         vm.prank(tenant);
         vm.expectRevert("RentVault: amount must be greater than zero");
-        rentVault.depositRent(0);
+        rentVault.depositRent{value: 0}(0);
     }
 
     function testResetPeriod() public {
         uint256 amount = 5000 * 1e18;
         
         vm.startPrank(tenant);
-        usdc.approve(address(rentVault), amount);
-        rentVault.depositRent(amount);
+        rentVault.depositRent{value: amount}(amount);
         vm.stopPrank();
 
         vm.prank(owner);
@@ -74,16 +64,16 @@ contract RentVaultTest is Test {
         uint256 amount = 5000 * 1e18;
         
         vm.startPrank(tenant);
-        usdc.approve(address(rentVault), amount);
-        rentVault.depositRent(amount);
+        rentVault.depositRent{value: amount}(amount);
         vm.stopPrank();
 
         address recipient = address(3);
+        uint256 recipientBalanceBefore = recipient.balance;
         vm.prank(owner);
         rentVault.withdraw(recipient, amount);
 
-        assertEq(usdc.balanceOf(recipient), amount);
-        assertEq(usdc.balanceOf(address(rentVault)), 0);
+        assertEq(recipient.balance, recipientBalanceBefore + amount);
+        assertEq(address(rentVault).balance, 0);
     }
 
     function testWithdrawFailsIfNotOwner() public {

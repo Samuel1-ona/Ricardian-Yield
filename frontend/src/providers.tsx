@@ -1,9 +1,9 @@
 import React, { useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig, http } from "wagmi";
-import { mantleTestnet } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
 import { Toaster } from "react-hot-toast";
+import { MANTLE_SEPOLIA } from "@/lib/contracts";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -33,12 +33,12 @@ let wagmiConfig: ReturnType<typeof createConfig> | undefined = undefined;
 function getWagmiConfig() {
   if (!wagmiConfig) {
     wagmiConfig = createConfig({
-      chains: [mantleTestnet],
+      chains: [MANTLE_SEPOLIA],
       connectors: [
         injected(),
       ],
       transports: {
-        [mantleTestnet.id]: http("https://rpc.testnet.mantle.xyz", {
+        [MANTLE_SEPOLIA.id]: http(MANTLE_SEPOLIA.rpcUrls.default.http[0], {
           timeout: 10000,
         }),
       },

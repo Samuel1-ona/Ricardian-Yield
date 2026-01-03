@@ -1,6 +1,6 @@
 # Ricardian Yield Frontend
 
-A modern React web application for the Ricardian Yield platform, built with Next.js, TypeScript, and Tailwind CSS. Features a green and white color scheme with intuitive UX for property management, rent collection, expense tracking, yield distribution, and yield stacking.
+A modern React web application for the Ricardian Yield platform, built with Vite, React, TypeScript, and Tailwind CSS. Features a green and white color scheme with intuitive UX for property management, rent collection, expense tracking, yield distribution, and yield stacking.
 
 ## Features
 
@@ -17,12 +17,13 @@ A modern React web application for the Ricardian Yield platform, built with Next
 
 ## Tech Stack
 
-- **Framework**: Next.js 16 (App Router)
+- **Framework**: React 18 with Vite
 - **Language**: TypeScript
+- **Routing**: React Router v6
 - **Styling**: Tailwind CSS (green/white theme)
 - **Web3**: wagmi + viem (Ethereum/Mantle connection)
 - **Charts**: Recharts
-- **UI Components**: Custom components with Radix UI primitives
+- **UI Components**: Custom components with Material Design principles
 - **State Management**: React Query (TanStack Query)
 - **Forms**: React Hook Form
 - **Notifications**: react-hot-toast
@@ -43,16 +44,13 @@ npm install
 
 ### Environment Variables
 
-Create a `.env.local` file:
+The `.env` file is already created with deployed contract addresses. If you need to customize:
 
-```bash
-# Contract Addresses (set after deployment)
-NEXT_PUBLIC_SYSTEM_ADDRESS=
-NEXT_PUBLIC_USDC_ADDRESS=
+1. Copy `.env.example` to `.env` (already done)
+2. Update contract addresses if deploying new contracts
+3. See `ENV_SETUP.md` for detailed documentation
 
-# WalletConnect (optional)
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
-```
+**Important**: The `.env` file uses `VITE_` prefix for all variables (required by Vite).
 
 ### Development
 
@@ -66,36 +64,46 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ```bash
 npm run build
-npm start
+npm run preview  # Preview production build
 ```
 
 ## Project Structure
 
 ```
 frontend/
-├── app/                    # Next.js app router pages
-│   ├── page.tsx           # Landing page
-│   ├── dashboard/         # Dashboard page
-│   ├── property/          # Property overview
-│   ├── rent/              # Rent deposit
-│   ├── expenses/          # Expense management
-│   ├── yield/             # Yield distribution
-│   ├── stacking/          # Yield stacking
-│   ├── capex/             # CapEx governance
-│   └── analytics/         # Analytics & reports
-├── components/
-│   ├── layout/            # Header, Footer
-│   ├── ui/                # Reusable UI components
-│   ├── dashboard/         # Dashboard-specific components
-│   └── charts/             # Chart components
-├── hooks/                 # Custom React hooks
-│   ├── useProperty.ts     # Property data hooks
-│   ├── useYield.ts        # Yield hooks
-│   └── useCashFlow.ts     # Cash flow hooks
-├── lib/                   # Utilities
-│   ├── contracts.ts       # Contract addresses & ABIs
-│   └── utils.ts           # Helper functions
-└── public/                # Static assets
+├── src/
+│   ├── pages/              # React Router pages
+│   │   ├── Home.tsx       # Landing page
+│   │   ├── Dashboard.tsx  # Dashboard page
+│   │   ├── Property.tsx   # Property overview
+│   │   ├── Rent.tsx       # Rent deposit
+│   │   ├── Expenses.tsx   # Expense management
+│   │   ├── Yield.tsx      # Yield distribution
+│   │   ├── Stacking.tsx   # Yield stacking
+│   │   ├── CapEx.tsx      # CapEx governance
+│   │   ├── Analytics.tsx  # Analytics & reports
+│   │   └── DAO.tsx        # DAO governance
+│   ├── components/
+│   │   ├── layout/        # Header, Footer
+│   │   ├── ui/            # Reusable UI components
+│   │   └── charts/        # Chart components
+│   ├── hooks/             # Custom React hooks
+│   │   ├── useProperty.ts # Property data hooks
+│   │   ├── useYield.ts    # Yield hooks
+│   │   ├── useCashFlow.ts # Cash flow hooks
+│   │   ├── useUSDC.ts     # USDC token hooks
+│   │   └── useContractWrite.ts # Write operation hooks
+│   ├── lib/               # Utilities
+│   │   ├── contracts.ts   # Contract addresses & ABIs
+│   │   ├── abis/          # Contract ABI JSON files
+│   │   └── utils.ts       # Helper functions
+│   ├── App.tsx            # Root component with routes
+│   ├── main.tsx           # Entry point
+│   └── providers.tsx      # Wagmi & React Query providers
+├── public/                # Static assets
+├── .env                   # Environment variables (gitignored)
+├── .env.example           # Environment template
+└── vite.config.ts         # Vite configuration
 ```
 
 ## Design System
@@ -116,11 +124,15 @@ frontend/
 
 ## Contract Integration
 
-The frontend uses placeholder ABIs and contract addresses. After deploying the smart contracts:
+The frontend is fully integrated with deployed smart contracts on Mantle Sepolia Testnet:
 
-1. Update contract addresses in `lib/contracts.ts`
-2. Import actual ABIs from compiled contracts
-3. Update hooks in `hooks/` directory to use real contract functions
+1. ✅ Contract addresses configured in `.env` and `lib/contracts.ts`
+2. ✅ ABIs imported from compiled contracts in `lib/abis/`
+3. ✅ Hooks in `hooks/` directory use real contract functions
+4. ✅ Rent deposit functionality fully working
+5. ⏳ Additional pages (Yield, Expenses, CapEx, DAO) ready for integration
+
+See `CONTRACT_INTEGRATION.md` for detailed integration status.
 
 ## Responsive Design
 
@@ -129,14 +141,19 @@ All pages are mobile-responsive using Tailwind's responsive utilities:
 - Breakpoints: `sm:`, `md:`, `lg:`, `xl:`
 - Grid layouts adapt to screen size
 
+## Contract Deployment
+
+Contracts are deployed on Mantle Sepolia Testnet. See `deployed-contracts.json` in the root directory for all addresses.
+
 ## Next Steps
 
-1. **Deploy Contracts**: Deploy smart contracts to Mantle testnet
-2. **Update ABIs**: Import actual contract ABIs
-3. **Connect Contracts**: Wire up all contract interactions
-4. **Add Error Handling**: Improve error messages and recovery
-5. **Testing**: Add unit and integration tests
-6. **Optimization**: Performance optimization and code splitting
+1. ✅ **Deploy Contracts**: Contracts deployed to Mantle Sepolia testnet
+2. ✅ **Update ABIs**: Contract ABIs imported and configured
+3. ✅ **Connect Contracts**: Rent deposit fully integrated
+4. ⏳ **Complete Integration**: Finish integration for Yield, Expenses, CapEx, DAO pages
+5. ⏳ **Add Error Handling**: Improve error messages and recovery
+6. ⏳ **Testing**: Add unit and integration tests
+7. ⏳ **Optimization**: Performance optimization and code splitting
 
 ## License
 
