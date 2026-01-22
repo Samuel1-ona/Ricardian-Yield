@@ -63,15 +63,13 @@
   )
 )
 
-;; Deposit rent - transfers USDCx from user to contract
-;; User must have approved this contract or transfers directly
+;; Deposit rent - records rent deposit after user transfers USDCx to this contract
+;; User must transfer tokens to this contract first, then call this function to update records
+;; Note: This function assumes tokens were already transferred and just updates the records
 (define-public (deposit-rent (property-id uint) (amount uint))
   (begin
     (asserts! (> property-id u0) ERR-INVALID-PROPERTY-ID)
     (asserts! (> amount u0) ERR-INVALID-AMOUNT)
-    
-    ;; Transfer USDCx from sender to this contract
-    (try! (contract-call? usdcx-token transfer amount tx-sender (as-contract tx-sender) none))
     
     ;; Update property rent data
     (match (map-get? property-rent {property-id: property-id})

@@ -56,9 +56,10 @@
     (asserts! (> (len description) u0) ERR-INVALID-DESCRIPTION)
     
     (let (
-      (proposal-id (default-to u0 
+      (current-count (default-to u0 
         (get count (map-get? proposal-counts {property-id: property-id}))
       ))
+      (proposal-id (+ current-count u1))
     )
       (begin
         (map-set proposals 
@@ -74,7 +75,7 @@
         )
         (map-set proposal-counts 
           {property-id: property-id}
-          {count: (+ proposal-id u1)}
+          {count: proposal-id}
         )
         (ok proposal-id)
       )
