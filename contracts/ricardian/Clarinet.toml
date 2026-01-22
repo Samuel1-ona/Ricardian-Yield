@@ -1,0 +1,76 @@
+[project]
+name = 'ricardian'
+description = ''
+authors = []
+telemetry = true
+cache_dir = './.cache'
+
+[[project.requirements]]
+contract_id = 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait'
+
+[[project.requirements]]
+contract_id = 'ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.sip-010-trait-ft-standard'
+
+[[project.requirements]]
+contract_id = 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx'
+[contracts.cash-flow-engine_clar]
+path = 'contracts/cash-flow-engine_clar.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.property-nft_clar]
+path = 'contracts/property-nft_clar.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.property-shares_clar]
+path = 'contracts/property-shares_clar.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.rent-vault_clar]
+path = 'contracts/rent-vault_clar.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.simple-dao_clar]
+path = 'contracts/simple-dao_clar.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.trait-cash-flow-engine]
+path = 'contracts/trait-cash-flow-engine.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.trait-property-nft]
+path = 'contracts/trait-property-nft.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.trait-rent-vault]
+path = 'contracts/trait-rent-vault.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.trait-simple-dao]
+path = 'contracts/trait-simple-dao.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.yield-distributor_clar]
+path = 'contracts/yield-distributor_clar.clar'
+clarity_version = 3
+epoch = 'latest'
+[repl.analysis]
+passes = ['check_checker']
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false
+
+[repl.remote_data]
+enabled = false
+api_url = 'https://api.hiro.so'
