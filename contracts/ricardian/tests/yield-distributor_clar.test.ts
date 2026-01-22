@@ -36,14 +36,14 @@ describe("yield-distributor_clar tests", () => {
   });
 
   describe("distribute-yield", () => {
-    it("should fail if not called by owner", () => {
+    it("should fail if not called by property owner", () => {
       const { result } = simnet.callPublicFn(
         "yield-distributor_clar",
         "distribute-yield",
         [Cl.uint(1)],
-        address1
+        address2
       );
-      expect(result).toBeErr(Cl.uint(100)); // ERR-NOT-AUTHORIZED
+      expect(result).toBeErr(Cl.uint(111)); // ERR-NOT-PROPERTY-OWNER
     });
 
     it("should fail with invalid property ID", () => {
@@ -51,7 +51,7 @@ describe("yield-distributor_clar tests", () => {
         "yield-distributor_clar",
         "distribute-yield",
         [Cl.uint(0)],
-        deployer
+        address1
       );
       expect(result).toBeErr(Cl.uint(101)); // ERR-INVALID-PROPERTY-ID
     });
@@ -62,7 +62,7 @@ describe("yield-distributor_clar tests", () => {
         "yield-distributor_clar",
         "distribute-yield",
         [Cl.uint(1)],
-        deployer
+        address1
       );
       // Should fail with ERR-NO-DISTRIBUTABLE
       expect(result).toBeErr(Cl.uint(103)); // ERR-NO-DISTRIBUTABLE
@@ -237,19 +237,19 @@ describe("yield-distributor_clar tests", () => {
         "yield-distributor_clar",
         "reset-distribution-period",
         [Cl.uint(1)],
-        deployer
+        address1
       );
       expect(result).toBeOk(Cl.bool(true));
     });
 
-    it("should fail if not called by owner", () => {
+    it("should fail if not called by property owner", () => {
       const { result } = simnet.callPublicFn(
         "yield-distributor_clar",
         "reset-distribution-period",
         [Cl.uint(1)],
-        address1
+        address2
       );
-      expect(result).toBeErr(Cl.uint(100)); // ERR-NOT-AUTHORIZED
+      expect(result).toBeErr(Cl.uint(111)); // ERR-NOT-PROPERTY-OWNER
     });
 
     it("should fail with invalid property ID", () => {
@@ -257,7 +257,7 @@ describe("yield-distributor_clar tests", () => {
         "yield-distributor_clar",
         "reset-distribution-period",
         [Cl.uint(0)],
-        deployer
+        address1
       );
       expect(result).toBeErr(Cl.uint(101)); // ERR-INVALID-PROPERTY-ID
     });
@@ -267,7 +267,7 @@ describe("yield-distributor_clar tests", () => {
         "yield-distributor_clar",
         "reset-distribution-period",
         [Cl.uint(1)],
-        deployer
+        address1
       );
 
       const { result } = simnet.callReadOnlyFn(

@@ -3,13 +3,9 @@
 ;; summary: Yield Distributor contract for distributing yield to shareholders
 ;; description: Creates distribution snapshots and allows shareholders to claim their proportional yield
 
-
-
-(define-constant contract-owner tx-sender)
 (define-constant usdcx-token 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx)
 
 ;; Error codes
-(define-constant ERR-NOT-AUTHORIZED (err u100))
 (define-constant ERR-INVALID-PROPERTY-ID (err u101))
 (define-constant ERR-INVALID-PERIOD (err u102))
 (define-constant ERR-NO-DISTRIBUTABLE (err u103))
@@ -20,6 +16,7 @@
 (define-constant ERR-NO-BALANCE (err u108))
 (define-constant ERR-NO-YIELD (err u109))
 (define-constant ERR-DISTRIBUTION-NOT-FOUND (err u110))
+(define-constant ERR-NOT-PROPERTY-OWNER (err u111))
 
 ;; Distribution data per property and period
 (define-map distributions 
@@ -42,13 +39,21 @@
   {period: uint}
 )
 
-
+;; Check if caller is property owner
+(define-private (is-property-owner (property-id uint) (caller principal))
+  (let ((owner-opt (unwrap! (contract-call? .property-nft_clar get-owner property-id) false)))
+    (match owner-opt
+      owner (is-eq owner caller)
+      false
+    )
+  )
+)
 
 ;; Distribute yield for a property (owner only)
 (define-public (distribute-yield (property-id uint))
   (begin
     (asserts! (> property-id u0) ERR-INVALID-PROPERTY-ID)
-    (asserts! (is-eq tx-sender contract-owner) ERR-NOT-AUTHORIZED)
+    (asserts! (is-property-owner property-id tx-sender) ERR-NOT-PROPERTY-OWNER)
     
     (match (contract-call? .cash-flow-engine_clar get-distributable-cash-flow property-id)
       distributable (begin
@@ -201,7 +206,7 @@
 (define-public (reset-distribution-period (property-id uint))
   (begin
     (asserts! (> property-id u0) ERR-INVALID-PROPERTY-ID)
-    (asserts! (is-eq tx-sender contract-owner) ERR-NOT-AUTHORIZED)
+    (asserts! (is-property-owner property-id tx-sender) ERR-NOT-PROPERTY-OWNER)
     
     (let (
       (current (default-to u0 
