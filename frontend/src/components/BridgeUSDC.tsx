@@ -1,5 +1,5 @@
 // Component for bridging USDC to USDCx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useBridgeUSDC } from '@/hooks/useBridgeUSDC';
@@ -10,9 +10,10 @@ import toast from 'react-hot-toast';
 
 interface BridgeUSDCProps {
   onBridged?: () => void;
+  inline?: boolean; // If true, renders without Card wrapper for inline use
 }
 
-export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
+export function BridgeUSDC({ onBridged, inline = false }: BridgeUSDCProps) {
   const { address: stacksAddress } = useStacks();
   const { 
     address: ethAddress, 
@@ -23,6 +24,7 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
     switchToSepolia
   } = useEthereum('testnet');
   const [amount, setAmount] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState(stacksAddress || '');
   const [showBridgeForm, setShowBridgeForm] = useState(false);
 
   const SEPOLIA_CHAIN_ID = 11155111;
@@ -32,9 +34,28 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
     network: 'testnet',
   });
 
+  // Update recipient address when Stacks wallet connects
+  useEffect(() => {
+    if (stacksAddress && !recipientAddress) {
+      setRecipientAddress(stacksAddress);
+    }
+  }, [stacksAddress, recipientAddress]);
+
+  // Validate Stacks address format (starts with ST or SP)
+  const isValidStacksAddress = (address: string): boolean => {
+    if (!address) return false;
+    const trimmed = address.trim();
+    return (trimmed.startsWith('ST') || trimmed.startsWith('SP')) && trimmed.length >= 39;
+  };
+
   const handleBridge = async () => {
-    if (!stacksAddress) {
-      toast.error('Please connect your Stacks wallet first');
+    if (!recipientAddress || !recipientAddress.trim()) {
+      toast.error('Please enter a Stacks recipient address');
+      return;
+    }
+
+    if (!isValidStacksAddress(recipientAddress)) {
+      toast.error('Please enter a valid Stacks address (starts with ST or SP)');
       return;
     }
 
@@ -59,7 +80,7 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
     }
 
     try {
-      await bridgeUSDC(amount, stacksAddress);
+      await bridgeUSDC(amount, recipientAddress.trim());
       setAmount('');
       onBridged?.();
     } catch (error: any) {
@@ -68,8 +89,25 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
   };
 
   if (!showBridgeForm) {
+    if (inline) {
+      return (
+        <div className="border-2 border-dashed border-primary/30 rounded-lg p-4 bg-primary/5">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 mb-4">
+              You need USDCx on Stacks to deposit rent. Bridge USDC from Ethereum to get started.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => setShowBridgeForm(true)}
+            >
+              Bridge USDC → USDCx
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return (
-      <Card className="border-2 border-dashed border-primary/30">
+      <Card className="border-2 border-dashed border-primary/30 w-full">
         <CardContent className="pt-6">
           <div className="text-center">
             <p className="text-sm text-gray-600 mb-4">
@@ -92,18 +130,11 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
     window.ethereum && 
     (window.ethereum as any).isMetaMask;
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Bridge USDC to USDCx</CardTitle>
-        <CardDescription>
-          Bridge USDC from Ethereum Sepolia to USDCx on Stacks testnet
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const content = (
+    <div className="space-y-4 overflow-hidden">
         {!isMetaMaskInstalled && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <p className="text-xs text-yellow-800">
+            <p className="text-xs text-yellow-800 break-words">
               <strong>MetaMask Required:</strong> Please install MetaMask browser extension to bridge USDC.
               <a
                 href="https://metamask.io/download/"
@@ -118,16 +149,16 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
         )}
 
         {/* Ethereum Wallet Connection */}
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Ethereum Wallet (MetaMask)
           </label>
           {isEthConnected && ethAddress ? (
             <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div>
+              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg min-w-0">
+                <div className="min-w-0 flex-1 mr-2">
                   <p className="text-sm font-medium text-green-800">Connected</p>
-                  <p className="text-xs text-green-600">{formatAddress(ethAddress)}</p>
+                  <p className="text-xs text-green-600 truncate">{formatAddress(ethAddress)}</p>
                 </div>
                 <Button
                   variant="outline"
@@ -136,19 +167,20 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
                     // Disconnect handled by useEthereum hook
                     window.location.reload(); // Simple way to disconnect
                   }}
+                  className="flex-shrink-0"
                 >
                   Disconnect
                 </Button>
               </div>
               {/* Network Status */}
               {chainId && (
-                <div className={`p-3 rounded-lg border ${
+                <div className={`p-3 rounded-lg border min-w-0 ${
                   isOnSepolia 
                     ? 'bg-green-50 border-green-200' 
                     : 'bg-yellow-50 border-yellow-200'
                 }`}>
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
                       <p className={`text-sm font-medium ${
                         isOnSepolia ? 'text-green-800' : 'text-yellow-800'
                       }`}>
@@ -165,7 +197,7 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
                         variant="outline"
                         size="sm"
                         onClick={switchToSepolia}
-                        className="ml-2"
+                        className="flex-shrink-0"
                       >
                         Switch to Sepolia
                       </Button>
@@ -187,17 +219,40 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
           )}
         </div>
 
-        {/* Stacks Address Display */}
-        {stacksAddress && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Stacks Recipient Address
-            </label>
-            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-xs text-gray-600">{formatAddress(stacksAddress)}</p>
-            </div>
-          </div>
-        )}
+        {/* Stacks Recipient Address Input */}
+        <div className="min-w-0">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Stacks Recipient Address
+          </label>
+          <input
+            type="text"
+            value={recipientAddress}
+            onChange={(e) => setRecipientAddress(e.target.value)}
+            placeholder="ST1F1M4YP67NV360FBYR28V7C599AC46F8C4635SH"
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none ${
+              recipientAddress && !isValidStacksAddress(recipientAddress)
+                ? 'border-red-300 bg-red-50'
+                : 'border-gray-300'
+            }`}
+          />
+          {stacksAddress && (
+            <button
+              type="button"
+              onClick={() => setRecipientAddress(stacksAddress)}
+              className="mt-1 text-xs text-primary hover:underline"
+            >
+              Use connected wallet address
+            </button>
+          )}
+          {recipientAddress && !isValidStacksAddress(recipientAddress) && (
+            <p className="mt-1 text-xs text-red-600">
+              Invalid Stacks address. Must start with ST or SP and be at least 39 characters.
+            </p>
+          )}
+          <p className="mt-1 text-xs text-gray-500">
+            Enter the Stacks address that will receive the USDCx tokens
+          </p>
+        </div>
 
         {/* Amount Input */}
         <div>
@@ -220,7 +275,7 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
 
         {/* Process Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-xs text-blue-800">
+          <p className="text-xs text-blue-800 break-words">
             <strong>Process:</strong> This will approve xReserve to spend your USDC, then initiate the bridge.
             USDCx will be minted on Stacks in ~15 minutes.
           </p>
@@ -231,9 +286,17 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
           <Button
             variant="primary"
             onClick={handleBridge}
-            disabled={isPending || !amount || !isEthConnected || !stacksAddress || !isMetaMaskInstalled || !isOnSepolia}
+            disabled={
+              isPending || 
+              !amount || 
+              !isEthConnected || 
+              !recipientAddress || 
+              !isValidStacksAddress(recipientAddress) || 
+              !isMetaMaskInstalled || 
+              !isOnSepolia
+            }
             isLoading={isPending}
-            className="flex-1"
+            className="flex-1 min-w-0"
           >
             {isApproving ? 'Approving...' : isDepositing ? 'Bridging...' : 'Bridge USDC'}
           </Button>
@@ -242,8 +305,10 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
             onClick={() => {
               setShowBridgeForm(false);
               setAmount('');
+              setRecipientAddress(stacksAddress || '');
             }}
             disabled={isPending}
+            className="flex-shrink-0"
           >
             Cancel
           </Button>
@@ -253,6 +318,33 @@ export function BridgeUSDC({ onBridged }: BridgeUSDCProps) {
             Please switch to Sepolia testnet to continue
           </p>
         )}
+    </div>
+  );
+
+  if (inline) {
+    return (
+      <div>
+        <div className="mb-3">
+          <h3 className="text-lg font-semibold text-foreground">Bridge USDC to USDCx</h3>
+          <p className="text-sm text-gray-600">
+            Bridge USDC from Ethereum Sepolia to USDCx on Stacks testnet
+          </p>
+        </div>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Bridge USDC to USDCx</CardTitle>
+        <CardDescription>
+          Bridge USDC from Ethereum Sepolia to USDCx on Stacks testnet
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {content}
       </CardContent>
     </Card>
   );

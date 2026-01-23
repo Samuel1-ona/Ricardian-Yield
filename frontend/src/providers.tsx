@@ -29,24 +29,24 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const queryClient = useMemo(() => getQueryClient(), []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: "#fff",
-            color: "#111827",
-            border: "1px solid #10B981",
-          },
-          success: {
-            iconTheme: {
-              primary: "#10B981",
-              secondary: "#fff",
+      <QueryClientProvider client={queryClient}>
+        {children}
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: "#fff",
+              color: "#111827",
+              border: "1px solid #10B981",
             },
-          },
-        }}
-      />
-    </QueryClientProvider>
+            success: {
+              iconTheme: {
+                primary: "#10B981",
+                secondary: "#fff",
+              },
+            },
+          }}
+        />
+      </QueryClientProvider>
   );
 }

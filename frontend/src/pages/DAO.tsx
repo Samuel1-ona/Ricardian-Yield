@@ -236,7 +236,7 @@ export default function DAOPage() {
 
 // Component to display a single proposal
 function ProposalItem({ 
-  proposalId,
+  proposalId, 
   propertyId,
   onVote,
   isVoting 

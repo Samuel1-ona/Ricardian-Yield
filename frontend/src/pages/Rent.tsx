@@ -84,55 +84,54 @@ export default function RentPage() {
 
   return (
     <main className="flex-1 bg-gray-50 relative pattern-dots">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <div className="mb-8">
           <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Deposit Rent</h1>
           <p className="text-gray-600 font-light text-lg">Record a new rent payment with USDCx</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Deposit Form */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* USDCx Balance & Bridge */}
-            <Card>
+          {/* Main Deposit Card - All in One */}
+          <div className="lg:col-span-2">
+            <Card className="w-full">
               <CardHeader>
-                <CardTitle>Your USDCx Balance</CardTitle>
-                <CardDescription>USDCx on Stacks testnet</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-gradient-to-r from-primary/10 to-[#06B6D4]/10 rounded-lg p-4 border border-primary/20">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700">Balance:</span>
-                    <span className="text-lg font-semibold text-primary">
-                      {isLoadingBalance ? "Loading..." : `${formattedBalance} USDCx`}
-                    </span>
-                  </div>
-                  {hasNoBalance && !isLoadingBalance && (
-                    <div className="mt-3 pt-3 border-t border-primary/20">
-                      <p className="text-xs text-gray-600 mb-2">
-                        <strong>No USDCx in wallet.</strong> You need USDCx tokens to deposit rent.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Bridge Component */}
-            {hasNoBalance && !isLoadingBalance && (
-              <BridgeUSDC />
-            )}
-
-            {/* Deposit Form */}
-            <Card>
-              <CardHeader>
-                <CardTitle>New Rent Payment</CardTitle>
-                <CardDescription>Enter the rent amount in USDCx</CardDescription>
+                <CardTitle>Deposit Rent</CardTitle>
+                <CardDescription>Record a new rent payment with USDCx</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* USDCx Balance Section */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Amount (USDCx)
+                    Your USDCx Balance
+                  </label>
+                  <div className="bg-gradient-to-r from-primary/10 to-[#06B6D4]/10 rounded-lg p-4 border border-primary/20">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">Balance:</span>
+                      <span className="text-lg font-semibold text-primary">
+                        {isLoadingBalance ? "Loading..." : `${formattedBalance} USDCx`}
+                      </span>
+                    </div>
+                    {hasNoBalance && !isLoadingBalance && (
+                      <div className="mt-3 pt-3 border-t border-primary/20">
+                        <p className="text-xs text-gray-600">
+                          <strong>No USDCx in wallet.</strong> You need USDCx tokens to deposit rent.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bridge Section - Inline */}
+                {hasNoBalance && !isLoadingBalance && (
+                  <div className="border-t border-gray-200 pt-6">
+                    <BridgeUSDC inline={true} />
+                  </div>
+                )}
+
+                {/* Deposit Form Section */}
+                <div className="border-t border-gray-200 pt-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Amount to Deposit (USDCx)
                   </label>
                   <input
                     type="number"
@@ -149,33 +148,33 @@ export default function RentPage() {
                       Insufficient balance. You need {amount} USDCx but only have {formattedBalance} USDCx.
                     </p>
                   )}
-                </div>
+                  
+                  <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-xs text-blue-800">
+                      <strong>Note:</strong> This will transfer USDCx to the rent vault and record the deposit.
+                      Make sure you have enough USDCx for the deposit.
+                    </p>
+                  </div>
 
-                <div className="bg-primary-light rounded-lg p-4">
-                  <p className="text-sm text-primary-dark">
-                    <strong>Note:</strong> This will transfer USDCx to the rent vault and record the deposit.
-                    Make sure you have enough USDCx for the deposit.
-                  </p>
-                </div>
-
-                <div className="flex gap-4">
-                  <Button
-                    variant="primary"
-                    className="flex-1"
-                    onClick={handleDeposit}
-                    isLoading={isDepositing}
-                    disabled={hasInsufficientBalance || hasNoBalance || !amount || parseFloat(amount) <= 0}
-                  >
-                    Deposit Rent
-                  </Button>
+                  <div className="mt-4">
+                    <Button
+                      variant="primary"
+                      className="w-full"
+                      onClick={handleDeposit}
+                      isLoading={isDepositing}
+                      disabled={hasInsufficientBalance || hasNoBalance || !amount || parseFloat(amount) <= 0}
+                    >
+                      Deposit Rent
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Payment History */}
+          {/* Payment History Sidebar */}
           <div>
-            <Card>
+            <Card className="w-full">
               <CardHeader>
                 <CardTitle>Payment History</CardTitle>
                 <CardDescription>
