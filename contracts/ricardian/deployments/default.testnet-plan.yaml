@@ -1,0 +1,112 @@
+---
+id: 0
+name: Testnet deployment
+network: testnet
+stacks-node: "https://api.testnet.hiro.so"
+bitcoin-node: "http://blockstack:blockstacksystem@bitcoind.testnet.stacks.co:18332"
+# Note: Addresses are stored in addresses.json
+# Replace {{DEPLOYER}} with the deployer address from addresses.json
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - requirement-publish:
+            contract-id: SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait
+            remap-sender: {{DEPLOYER}}
+            remap-principals:
+              SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9: {{DEPLOYER}}
+            cost: 4680
+            path: "./.cache/requirements/SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.clar"
+            clarity-version: 1
+      epoch: "2.0"
+    - id: 1
+      transactions:
+        - requirement-publish:
+            contract-id: ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.sip-010-trait-ft-standard
+            remap-sender: {{DEPLOYER}}
+            remap-principals:
+              ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT: {{DEPLOYER}}
+            cost: 8390
+            path: "./.cache/requirements/ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.sip-010-trait-ft-standard.clar"
+            clarity-version: 3
+      epoch: "3.1"
+    - id: 2
+      transactions:
+        - contract-publish:
+            contract-name: property-nft_clar
+            expected-sender: {{DEPLOYER}}
+            cost: 51670
+            path: contracts/property-nft_clar.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: rent-vault_clar
+            expected-sender: {{DEPLOYER}}
+            cost: 66180
+            path: contracts/rent-vault_clar.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: property-shares_clar
+            expected-sender: {{DEPLOYER}}
+            cost: 45420
+            path: contracts/property-shares_clar.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: simple-dao_clar
+            expected-sender: {{DEPLOYER}}
+            cost: 81040
+            path: contracts/simple-dao_clar.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: cash-flow-engine_clar
+            expected-sender: {{DEPLOYER}}
+            cost: 86730
+            path: contracts/cash-flow-engine_clar.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: trait-cash-flow-engine
+            expected-sender: {{DEPLOYER}}
+            cost: 7700
+            path: contracts/trait-cash-flow-engine.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: trait-property-nft
+            expected-sender: {{DEPLOYER}}
+            cost: 8130
+            path: contracts/trait-property-nft.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: trait-rent-vault
+            expected-sender: {{DEPLOYER}}
+            cost: 5180
+            path: contracts/trait-rent-vault.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: trait-simple-dao
+            expected-sender: {{DEPLOYER}}
+            cost: 6090
+            path: contracts/trait-simple-dao.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: usdcx
+            expected-sender: {{DEPLOYER}}
+            cost: 17550
+            path: contracts/mock-usdcx.clar
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: yield-distributor_clar
+            expected-sender: {{DEPLOYER}}
+            cost: 74170
+            path: contracts/yield-distributor_clar.clar
+            anchor-block-only: true
+            clarity-version: 3
+      epoch: "3.2"
