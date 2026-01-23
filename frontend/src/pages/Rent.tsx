@@ -1,29 +1,232 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { useStacks } from "@/hooks/useStacks";
 import { useUSDCxBalance } from "@/hooks/useUSDCx";
 import { useDepositRentWallet } from "@/hooks/useStacksWriteWallet";
-import { useRentCollected, useCurrentPeriod } from "@/hooks/useStacksRead";
+import { useRentCollected, useCurrentPeriod, useLastTokenId, usePropertyData } from "@/hooks/useStacksRead";
 import { BridgeUSDC } from "@/components/BridgeUSDC";
+import { getCachedPropertyName } from "@/lib/property-cache";
+
+// Helper component to display property option in dropdown
+function PropertyOption({ propertyId }: { propertyId: bigint }) {
+  const { propertyData } = usePropertyData(propertyId);
+  
+  // Extract name and location from property data
+  const displayText = useMemo(() => {
+    if (!propertyData) return `Property #${propertyId}`;
+    
+    try {
+      let tupleData: any = null;
+      if (propertyData.type === 'ok' && propertyData.value) {
+        const okValue = propertyData.value;
+        if (okValue.type === 'some' && okValue.value) {
+          const someValue = okValue.value;
+          if (someValue.type && someValue.type.includes('optional') && someValue.value) {
+            const optionalValue = someValue.value;
+            if (optionalValue.type && optionalValue.type.includes('tuple') && optionalValue.value) {
+              tupleData = optionalValue.value;
+            } else {
+              tupleData = optionalValue.value || optionalValue;
+            }
+          } else if (someValue.type && someValue.type.includes('tuple') && someValue.value) {
+            tupleData = someValue.value;
+          } else {
+            tupleData = someValue.value?.value || someValue.value || someValue;
+          }
+        }
+      }
+      
+      if (tupleData) {
+        let actualData = tupleData;
+        if (tupleData.value && tupleData.value.value && typeof tupleData.value.value === 'object') {
+          actualData = tupleData.value.value;
+        } else if (tupleData.value && typeof tupleData.value === 'object') {
+          if ('location' in tupleData.value || 'monthly-rent' in tupleData.value || 'valuation' in tupleData.value) {
+            actualData = tupleData.value;
+          } else if (tupleData.value.value) {
+            actualData = tupleData.value.value;
+          }
+        }
+        
+        let location = '';
+        
+        const locationField = actualData.location || actualData['location'];
+        if (locationField) {
+          if (typeof locationField === 'string') {
+            location = locationField;
+          } else if (locationField.value !== undefined) {
+            location = String(locationField.value);
+          }
+        }
+        
+        // Try to get name from cache
+        const cachedName = getCachedPropertyName(propertyId);
+        
+        // Return cached name if available, otherwise location, otherwise fallback
+        if (cachedName) return cachedName;
+        if (location) return location;
+      }
+    } catch (e) {
+      console.error('Error extracting property info:', e);
+    }
+    
+    return `Property #${propertyId}`;
+  }, [propertyData, propertyId]);
+  
+  return (
+    <option value={propertyId.toString()}>
+      {displayText}
+    </option>
+  );
+}
+
+// Helper component to display selected property info
+function PropertyInfo({ propertyId }: { propertyId: bigint }) {
+  const { propertyData } = usePropertyData(propertyId);
+  
+  const info = useMemo(() => {
+    if (!propertyData) return null;
+    
+    try {
+      let tupleData: any = null;
+      if (propertyData.type === 'ok' && propertyData.value) {
+        const okValue = propertyData.value;
+        if (okValue.type === 'some' && okValue.value) {
+          const someValue = okValue.value;
+          if (someValue.type && someValue.type.includes('optional') && someValue.value) {
+            const optionalValue = someValue.value;
+            if (optionalValue.type && optionalValue.type.includes('tuple') && optionalValue.value) {
+              tupleData = optionalValue.value;
+            } else {
+              tupleData = optionalValue.value || optionalValue;
+            }
+          } else if (someValue.type && someValue.type.includes('tuple') && someValue.value) {
+            tupleData = someValue.value;
+          } else {
+            tupleData = someValue.value?.value || someValue.value || someValue;
+          }
+        }
+      }
+      
+      if (tupleData) {
+        let actualData = tupleData;
+        if (tupleData.value && tupleData.value.value && typeof tupleData.value.value === 'object') {
+          actualData = tupleData.value.value;
+        } else if (tupleData.value && typeof tupleData.value === 'object') {
+          if ('location' in tupleData.value || 'monthly-rent' in tupleData.value || 'valuation' in tupleData.value) {
+            actualData = tupleData.value;
+          } else if (tupleData.value.value) {
+            actualData = tupleData.value.value;
+          }
+        }
+        
+        const locationField = actualData.location || actualData['location'];
+        const monthlyRentField = actualData['monthly-rent'] || actualData.monthlyRent;
+        
+        let location = '';
+        let monthlyRent: bigint | null = null;
+        
+        if (locationField) {
+          if (typeof locationField === 'string') {
+            location = locationField;
+          } else if (locationField.value !== undefined) {
+            location = String(locationField.value);
+          }
+        }
+        
+        if (monthlyRentField) {
+          if (typeof monthlyRentField === 'string' || typeof monthlyRentField === 'number') {
+            monthlyRent = BigInt(monthlyRentField);
+          } else if (monthlyRentField.value !== undefined) {
+            monthlyRent = BigInt(monthlyRentField.value);
+          }
+        }
+        
+        // Try to get name from cache
+        const cachedName = getCachedPropertyName(propertyId);
+        
+        return { 
+          name: cachedName,
+          location: location || `Property #${propertyId}`, 
+          monthlyRent 
+        };
+      }
+    } catch (e) {
+      console.error('Error extracting property info:', e);
+    }
+    
+    return null;
+  }, [propertyData, propertyId]);
+  
+  if (!info) return null;
+  
+  return (
+    <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+      <p className="text-sm font-medium text-gray-700">{info.name || info.location}</p>
+      {info.name && info.location && (
+        <p className="text-xs text-gray-500 mt-1">{info.location}</p>
+      )}
+      {info.monthlyRent && info.monthlyRent > BigInt(0) && (
+        <p className="text-xs text-gray-500 mt-1">
+          Expected Monthly Rent: {(Number(info.monthlyRent) / 1e6).toFixed(2)} USDCx
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function RentPage() {
-  const { isConnected, connect } = useStacks();
+  const { isConnected, connect, address } = useStacks();
+  const queryClient = useQueryClient();
   const [amount, setAmount] = useState("");
-  const [propertyId] = useState(BigInt(1)); // TODO: Get from context or props
+  
+  // Get total properties to list them
+  const { lastTokenId } = useLastTokenId();
+  
+  // Generate list of property IDs
+  const propertyIds = useMemo(() => {
+    if (!lastTokenId || lastTokenId === BigInt(0)) return [];
+    const ids: bigint[] = [];
+    for (let i = BigInt(1); i <= lastTokenId; i++) {
+      ids.push(i);
+    }
+    return ids;
+  }, [lastTokenId]);
+  
+  // State for selected property
+  const [selectedPropertyId, setSelectedPropertyId] = useState<bigint | null>(
+    propertyIds.length > 0 ? propertyIds[0] : null
+  );
+  
+  // Update selected property when propertyIds change
+  useEffect(() => {
+    if (propertyIds.length > 0 && selectedPropertyId === null) {
+      setSelectedPropertyId(propertyIds[0]);
+    }
+  }, [propertyIds, selectedPropertyId]);
+  
+  const propertyId = selectedPropertyId || BigInt(1);
   
   // Contract hooks
   const { depositRent, isPending: isDepositing } = useDepositRentWallet();
   const { balance: usdcxBalance, formatted: formattedBalance, isLoading: isLoadingBalance } = useUSDCxBalance();
   const { rentCollected } = useRentCollected(propertyId);
   const { currentPeriod } = useCurrentPeriod(propertyId);
-  
-  // Handle successful deposit
+
+  // Handle successful deposit - invalidate balance query
   useEffect(() => {
-    // Note: In a real app, you'd listen for transaction confirmations
-    // For now, we rely on the hook's internal toast notifications
-  }, []);
+    // Invalidate balance query when deposit completes
+    if (!isDepositing && address) {
+      // Small delay to ensure transaction is confirmed on-chain
+      const timer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['usdcx-balance', address] });
+      }, 3000); // Wait 3 seconds for transaction confirmation
+      return () => clearTimeout(timer);
+    }
+  }, [isDepositing, address, queryClient]);
 
   const handleDeposit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -99,26 +302,55 @@ export default function RentPage() {
                 <CardDescription>Record a new rent payment with USDCx</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Property Selector */}
+                {propertyIds.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Property
+                    </label>
+                    <select
+                      value={selectedPropertyId?.toString() || ""}
+                      onChange={(e) => setSelectedPropertyId(BigInt(e.target.value))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white"
+                    >
+                      {propertyIds.map((id) => (
+                        <PropertyOption key={id.toString()} propertyId={id} />
+                      ))}
+                    </select>
+                    {selectedPropertyId && (
+                      <PropertyInfo propertyId={selectedPropertyId} />
+                    )}
+                  </div>
+                )}
+                
+                {propertyIds.length === 0 && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm text-yellow-800">
+                      <strong>No properties available.</strong> Please mint a property first on the Property page.
+                    </p>
+                  </div>
+                )}
+
                 {/* USDCx Balance Section */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Your USDCx Balance
                   </label>
-                  <div className="bg-gradient-to-r from-primary/10 to-[#06B6D4]/10 rounded-lg p-4 border border-primary/20">
-                    <div className="flex justify-between items-center">
+                <div className="bg-gradient-to-r from-primary/10 to-[#06B6D4]/10 rounded-lg p-4 border border-primary/20">
+                  <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-gray-700">Balance:</span>
-                      <span className="text-lg font-semibold text-primary">
+                    <span className="text-lg font-semibold text-primary">
                         {isLoadingBalance ? "Loading..." : `${formattedBalance} USDCx`}
-                      </span>
-                    </div>
+                    </span>
+                  </div>
                     {hasNoBalance && !isLoadingBalance && (
-                      <div className="mt-3 pt-3 border-t border-primary/20">
+                    <div className="mt-3 pt-3 border-t border-primary/20">
                         <p className="text-xs text-gray-600">
                           <strong>No USDCx in wallet.</strong> You need USDCx tokens to deposit rent.
-                        </p>
+                      </p>
                       </div>
                     )}
-                  </div>
+                    </div>
                 </div>
 
                 {/* Bridge Section - Inline */}
@@ -153,19 +385,19 @@ export default function RentPage() {
                     <p className="text-xs text-blue-800">
                       <strong>Note:</strong> This will transfer USDCx to the rent vault and record the deposit.
                       Make sure you have enough USDCx for the deposit.
-                    </p>
-                  </div>
+                  </p>
+                </div>
 
                   <div className="mt-4">
-                    <Button
-                      variant="primary"
+                  <Button
+                    variant="primary"
                       className="w-full"
-                      onClick={handleDeposit}
-                      isLoading={isDepositing}
-                      disabled={hasInsufficientBalance || hasNoBalance || !amount || parseFloat(amount) <= 0}
-                    >
-                      Deposit Rent
-                    </Button>
+                    onClick={handleDeposit}
+                    isLoading={isDepositing}
+                      disabled={hasInsufficientBalance || hasNoBalance || !amount || parseFloat(amount) <= 0 || !selectedPropertyId || propertyIds.length === 0}
+                  >
+                    Deposit Rent
+                  </Button>
                   </div>
                 </div>
               </CardContent>

@@ -6,6 +6,7 @@ import {
 } from '@stacks/transactions';
 import { STACKS_TESTNET } from '@stacks/network';
 import { openContractCall } from '@stacks/connect';
+import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getContractAddress, parseContractAddress, getUSDCxAddress } from '@/lib/stacks-contracts';
 import { useStacks } from './useStacks';
@@ -84,6 +85,7 @@ function useStacksWriteWallet() {
 export function useDepositRentWallet() {
   const { address } = useStacks();
   const { makeCall, isPending, error } = useStacksWriteWallet();
+  const queryClient = useQueryClient();
   const [isTransferring, setIsTransferring] = useState(false);
 
   const depositRent = async (propertyId: bigint, amount: string) => {
@@ -122,6 +124,9 @@ export function useDepositRentWallet() {
           toast.success('USDCx transferred', { id: 'transfer' });
           setIsTransferring(false);
 
+          // Invalidate USDCx balance query to refetch updated balance
+          queryClient.invalidateQueries({ queryKey: ['usdcx-balance', address] });
+
           // Step 2: Call deposit-rent to update records
           toast.loading('Recording rent deposit...', { id: 'deposit' });
 
@@ -130,6 +135,9 @@ export function useDepositRentWallet() {
             'deposit-rent',
             [Cl.uint(Number(propertyId)), Cl.uint(amountMicro)],
           );
+
+          // Invalidate balance again after deposit-rent completes
+          queryClient.invalidateQueries({ queryKey: ['usdcx-balance', address] });
 
           toast.success('Rent deposited successfully!', { id: 'deposit' });
         },

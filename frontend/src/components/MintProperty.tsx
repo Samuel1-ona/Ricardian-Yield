@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useMintProperty } from '@/hooks/useStacksWriteWallet';
+import { useLastTokenId } from '@/hooks/useStacksRead';
+import { cachePropertyName } from '@/lib/property-cache';
 import toast from 'react-hot-toast';
 
 interface MintPropertyProps {
@@ -11,6 +13,8 @@ interface MintPropertyProps {
 
 export function MintProperty({ onMinted }: MintPropertyProps) {
   const { mintProperty, isPending } = useMintProperty();
+  const { lastTokenId } = useLastTokenId();
+  const [name, setName] = useState('');
   const [location, setLocation] = useState('');
   const [valuation, setValuation] = useState('');
   const [monthlyRent, setMonthlyRent] = useState('');
@@ -18,6 +22,11 @@ export function MintProperty({ onMinted }: MintPropertyProps) {
   const [showForm, setShowForm] = useState(false);
 
   const handleMint = async () => {
+    if (!name.trim()) {
+      toast.error('Please enter a property name');
+      return;
+    }
+
     if (!location.trim()) {
       toast.error('Please enter a location');
       return;
@@ -34,7 +43,21 @@ export function MintProperty({ onMinted }: MintPropertyProps) {
     }
 
     try {
-      await mintProperty(location, valuation, monthlyRent, metadataUri);
+      // Get the current last token ID to know what the new property ID will be
+      const currentLastTokenId = lastTokenId || BigInt(0);
+      const newPropertyId = currentLastTokenId + BigInt(1);
+      
+      // Use metadata URI if provided, otherwise use location
+      const finalMetadataUri = metadataUri.trim() || location.trim();
+      
+      await mintProperty(location, valuation, monthlyRent, finalMetadataUri);
+      
+      // Cache the property name after successful mint
+      if (name.trim()) {
+        cachePropertyName(newPropertyId, name.trim());
+      }
+      
+      setName('');
       setLocation('');
       setValuation('');
       setMonthlyRent('');
@@ -74,6 +97,22 @@ export function MintProperty({ onMinted }: MintPropertyProps) {
         <CardDescription>Create a new tokenized property</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Property Name *
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., Sunset Apartments, Downtown Office Building"
+            maxLength={200}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+            required
+          />
+          <p className="mt-1 text-xs text-gray-500">A friendly name for your property</p>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Location *
@@ -148,7 +187,7 @@ export function MintProperty({ onMinted }: MintPropertyProps) {
           <Button
             variant="primary"
             onClick={handleMint}
-            disabled={isPending || !location || !valuation || !monthlyRent}
+            disabled={isPending || !name || !location || !valuation || !monthlyRent}
             isLoading={isPending}
             className="flex-1"
           >
@@ -158,6 +197,7 @@ export function MintProperty({ onMinted }: MintPropertyProps) {
             variant="outline"
             onClick={() => {
               setShowForm(false);
+              setName('');
               setLocation('');
               setValuation('');
               setMonthlyRent('');

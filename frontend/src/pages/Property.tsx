@@ -14,6 +14,7 @@ import {
   useCapExSpent
 } from "@/hooks/useStacksRead";
 import { MintProperty } from "@/components/MintProperty";
+import { getCachedPropertyName } from "@/lib/property-cache";
 
 // Helper to extract numeric value (duplicate from useStacksRead for local use)
 function extractNumericValue(data: any): string | number | null {
@@ -315,6 +316,9 @@ export default function PropertyPage() {
     const cardInfo = useMemo(() => {
       if (!cardData) return null;
       
+      // First, try to get name from cache
+      const cachedName = getCachedPropertyName(propertyId);
+      
       let location = '';
       let valuation: bigint | null = null;
       
@@ -370,7 +374,11 @@ export default function PropertyPage() {
         }
       }
       
-      return { location: location || `Property #${propertyId}`, valuation: valuation || BigInt(0) };
+      return { 
+        name: cachedName,
+        location: location || `Property #${propertyId}`, 
+        valuation: valuation || BigInt(0) 
+      };
     }, [cardData, propertyId]);
     
     return (
@@ -379,8 +387,10 @@ export default function PropertyPage() {
         onClick={() => handlePropertyClick(propertyId)}
       >
         <CardHeader>
-          <CardTitle className="text-lg">{cardInfo?.location || `Property #${propertyId}`}</CardTitle>
-          <CardDescription>ID: {propertyId.toString()}</CardDescription>
+          <CardTitle className="text-lg">{cardInfo?.name || cardInfo?.location || `Property #${propertyId}`}</CardTitle>
+          <CardDescription>
+            {cardInfo?.name && cardInfo?.location ? cardInfo.location : `ID: ${propertyId.toString()}`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {cardInfo && cardInfo.valuation > BigInt(0) && (
