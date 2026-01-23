@@ -312,8 +312,29 @@ export function usePropertyOwner(propertyId?: bigint) {
     propertyId !== undefined ? [uintCV(Number(propertyId))] : [],
     { enabled: propertyId !== undefined }
   );
+  
+  // Extract owner address from ClarityValue JSON
+  let owner: string | undefined = undefined;
+  if (data) {
+    // Handle different response formats
+    if (typeof data === 'string') {
+      owner = data;
+    } else if (data.value) {
+      if (typeof data.value === 'string') {
+        owner = data.value;
+      } else if (data.value.value && typeof data.value.value === 'string') {
+        owner = data.value.value;
+      } else if (data.value.repr && typeof data.value.repr === 'string') {
+        // Extract from repr format (e.g., "ST1...")
+        owner = data.value.repr.replace(/^['"]|['"]$/g, ''); // Remove quotes if present
+      }
+    } else if (data.repr && typeof data.repr === 'string') {
+      owner = data.repr.replace(/^['"]|['"]$/g, '');
+    }
+  }
+  
   return {
-    owner: data?.value as string | undefined,
+    owner,
     isLoading: false,
     error: null,
   };

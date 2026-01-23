@@ -75,30 +75,165 @@ export default function PropertyPage() {
     if (!propertyData || !selectedPropertyId) return null;
     
     // Extract values from ClarityValue JSON structure
-    // The structure from cvToJSON might be different, so we need to handle various formats
+    // get-property-data returns: (ok (some (tuple (owner principal) (location string-ascii) (valuation uint) (monthly-rent uint) (metadata-uri string-ascii))))
+    // So the structure is: { type: "ok", value: { type: "some", value: { type: "tuple", value: { owner: ..., location: ..., valuation: ..., "monthly-rent": ... } } } }
+    
+    // Debug log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Property data raw:', JSON.stringify(propertyData, null, 2));
+    }
+    
     let location = '';
     let valuation: bigint | null = null;
     let monthlyRent: bigint | null = null;
     
-    // Try to extract location
-    if (propertyData.value?.location) {
-      location = propertyData.value.location;
-    } else if (propertyData.location) {
-      location = propertyData.location;
-    } else if (typeof propertyData === 'object' && 'location' in propertyData) {
-      location = String(propertyData.location || '');
+    // Navigate through the nested structure: ok -> some -> tuple -> data
+    // Based on the logs, the structure is: { type: "ok", value: { type: "some", value: { type: "optional", value: { type: "tuple", value: { location: {...}, ... } } } } }
+    let tupleData: any = null;
+    
+    // Handle ok response
+    if (propertyData.type === 'ok' && propertyData.value) {
+      const okValue = propertyData.value;
+      // Handle some optional
+      if (okValue.type === 'some' && okValue.value) {
+        const someValue = okValue.value;
+        // Handle optional wrapper (might be nested)
+        if (someValue.type && someValue.type.includes('optional') && someValue.value) {
+          const optionalValue = someValue.value;
+          // Handle tuple
+          if (optionalValue.type && optionalValue.type.includes('tuple') && optionalValue.value) {
+            tupleData = optionalValue.value;
+          } else {
+            tupleData = optionalValue.value || optionalValue;
+          }
+        } else if (someValue.type && someValue.type.includes('tuple') && someValue.value) {
+          // Direct tuple in some
+          tupleData = someValue.value;
+        } else {
+          // Go deeper if needed
+          tupleData = someValue.value?.value || someValue.value || someValue;
+        }
+      } else {
+        tupleData = okValue.value?.value || okValue.value || okValue;
+      }
+    } else if (propertyData.value) {
+      // Try direct value access
+      const dataValue = propertyData.value;
+      if (dataValue.type === 'some' && dataValue.value) {
+        const someVal = dataValue.value;
+        if (someVal.type && someVal.type.includes('optional') && someVal.value) {
+          tupleData = someVal.value.value || someVal.value;
+        } else if (someVal.type && someVal.type.includes('tuple') && someVal.value) {
+          tupleData = someVal.value;
+        } else {
+          tupleData = someVal.value?.value || someVal.value || someVal;
+        }
+      } else if (dataValue.type && dataValue.type.includes('tuple') && dataValue.value) {
+        tupleData = dataValue.value;
+      } else {
+        tupleData = dataValue.value?.value || dataValue.value || dataValue;
+      }
+    } else {
+      // Try direct access
+      tupleData = propertyData.value?.value || propertyData.value || propertyData;
     }
     
-    // Try to extract valuation
-    const valuationVal = extractNumericValue(propertyData.value?.valuation || propertyData.valuation);
-    if (valuationVal) {
-      valuation = BigInt(valuationVal);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Extracted tuple data:', JSON.stringify(tupleData, null, 2));
     }
     
-    // Try to extract monthly rent
-    const rentVal = extractNumericValue(propertyData.value?.monthlyRent || propertyData['monthly-rent'] || propertyData.monthlyRent);
-    if (rentVal) {
-      monthlyRent = BigInt(rentVal);
+    // Extract location from tuple - the actual data is nested in value.value
+    // Based on the log: tupleData.value.value contains { location: {...}, monthly-rent: {...}, valuation: {...} }
+    if (tupleData) {
+      // Check if we need to go one level deeper (tupleData.value.value)
+      let actualData = tupleData;
+      if (tupleData.value && tupleData.value.value && typeof tupleData.value.value === 'object') {
+        // The actual tuple data is at tupleData.value.value
+        actualData = tupleData.value.value;
+      } else if (tupleData.value && typeof tupleData.value === 'object') {
+        // Check if tupleData.value has the fields directly (not nested in another value)
+        if ('location' in tupleData.value || 'monthly-rent' in tupleData.value || 'valuation' in tupleData.value) {
+          actualData = tupleData.value;
+        } else if (tupleData.value.value) {
+          actualData = tupleData.value.value;
+        }
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Actual data to extract from:', JSON.stringify(actualData, null, 2));
+      }
+      
+      // Location can be in various formats
+      const locationField = actualData.location || actualData['location'];
+      if (locationField) {
+        if (typeof locationField === 'string') {
+          location = locationField;
+        } else if (locationField.value !== undefined) {
+          location = String(locationField.value);
+        } else if (locationField.repr) {
+          location = String(locationField.repr).replace(/^['"]|['"]$/g, '');
+        } else if (locationField.type === 'string-ascii' && locationField.value !== undefined) {
+          location = String(locationField.value);
+        }
+      }
+      
+      // Extract valuation
+      const valuationField = actualData.valuation || actualData['valuation'];
+      if (valuationField) {
+        if (typeof valuationField === 'string' || typeof valuationField === 'number') {
+          valuation = BigInt(valuationField);
+        } else if (valuationField.value !== undefined) {
+          valuation = BigInt(valuationField.value);
+        } else {
+          const valuationVal = extractNumericValue(valuationField);
+          if (valuationVal) {
+            valuation = BigInt(valuationVal);
+          }
+        }
+      }
+      
+      // Extract monthly rent (note: Clarity uses kebab-case "monthly-rent")
+      const rentField = actualData['monthly-rent'] || actualData.monthlyRent || actualData['monthly_rent'];
+      if (rentField) {
+        if (typeof rentField === 'string' || typeof rentField === 'number') {
+          monthlyRent = BigInt(rentField);
+        } else if (rentField.value !== undefined) {
+          monthlyRent = BigInt(rentField.value);
+        } else {
+          const rentVal = extractNumericValue(rentField);
+          if (rentVal) {
+            monthlyRent = BigInt(rentVal);
+          }
+        }
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Extracted property values:', {
+          location,
+          valuation: valuation?.toString(),
+          monthlyRent: monthlyRent?.toString(),
+        });
+      }
+    }
+    
+    // Ensure owner is a string
+    let ownerString = '';
+    if (owner) {
+      if (typeof owner === 'string') {
+        ownerString = owner;
+      } else if (typeof owner === 'object' && owner !== null) {
+        // Handle object responses (e.g., { value: "ST..." })
+        const ownerObj = owner as any;
+        if (ownerObj.value && typeof ownerObj.value === 'string') {
+          ownerString = ownerObj.value;
+        } else if (ownerObj.repr && typeof ownerObj.repr === 'string') {
+          ownerString = ownerObj.repr;
+        } else {
+          ownerString = String(owner);
+        }
+      } else {
+        ownerString = String(owner);
+      }
     }
     
     return {
@@ -106,7 +241,7 @@ export default function PropertyPage() {
       valuation: valuation || BigInt(0),
       monthlyRent: monthlyRent || BigInt(0),
       propertyId: Number(selectedPropertyId),
-      owner: owner || '',
+      owner: ownerString,
     };
   }, [propertyData, selectedPropertyId, owner]);
 
@@ -197,8 +332,8 @@ export default function PropertyPage() {
         <div className="mb-8">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Property Overview</h1>
-              <p className="text-gray-600 font-light text-lg">Detailed view of your tokenized property</p>
+          <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Property Overview</h1>
+          <p className="text-gray-600 font-light text-lg">Detailed view of your tokenized property</p>
             </div>
             {propertyIds.length > 1 && (
               <div className="flex gap-2">
@@ -224,7 +359,9 @@ export default function PropertyPage() {
             <CardTitle className="text-2xl">{property.location}</CardTitle>
             <CardDescription>
               Property ID: {property.propertyId}
-              {property.owner && ` • Owner: ${property.owner.slice(0, 6)}...${property.owner.slice(-4)}`}
+              {property.owner && typeof property.owner === 'string' && property.owner.length > 0 && (
+                ` • Owner: ${property.owner.slice(0, 6)}...${property.owner.slice(-4)}`
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
