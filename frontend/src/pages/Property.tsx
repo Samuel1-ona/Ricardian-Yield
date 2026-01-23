@@ -36,10 +36,13 @@ function extractNumericValue(data: any): string | number | null {
   return null;
 }
 
+type ViewMode = 'cards' | 'details' | 'mint';
+
 export default function PropertyPage() {
   const { isConnected, connect } = useStacks();
   const mounted = useMounted();
   const [selectedPropertyId, setSelectedPropertyId] = useState<bigint | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
 
   // Get total properties to list them
   const { lastTokenId } = useLastTokenId();
@@ -54,12 +57,30 @@ export default function PropertyPage() {
     return ids;
   }, [lastTokenId]);
 
-  // Auto-select first property if available and none selected
-  useMemo(() => {
-    if (propertyIds.length > 0 && selectedPropertyId === null) {
-      setSelectedPropertyId(propertyIds[0]);
-    }
-  }, [propertyIds, selectedPropertyId]);
+  // Handle property card click
+  const handlePropertyClick = (propertyId: bigint) => {
+    setSelectedPropertyId(propertyId);
+    setViewMode('details');
+  };
+
+  // Handle back to cards view
+  const handleBackToCards = () => {
+    setViewMode('cards');
+    setSelectedPropertyId(null);
+  };
+
+  // Handle mint button click
+  const handleMintClick = () => {
+    setViewMode('mint');
+    setSelectedPropertyId(null);
+  };
+
+  // Handle successful mint
+  const handleMinted = () => {
+    setViewMode('cards');
+    // Refresh will happen automatically via React Query
+    window.location.reload(); // Simple refresh for now
+  };
 
   // Get property data from contract
   const { propertyData } = usePropertyData(selectedPropertyId || undefined);
@@ -286,113 +307,180 @@ export default function PropertyPage() {
     );
   }
 
-  // If no properties exist, show mint form
-  if (propertyIds.length === 0) {
+  // Helper component to extract property data for a card
+  function PropertyCard({ propertyId }: { propertyId: bigint }) {
+    const { propertyData: cardData } = usePropertyData(propertyId);
+    
+    // Extract basic info for card display
+    const cardInfo = useMemo(() => {
+      if (!cardData) return null;
+      
+      let location = '';
+      let valuation: bigint | null = null;
+      
+      // Navigate through nested structure
+      let tupleData: any = null;
+      if (cardData.type === 'ok' && cardData.value) {
+        const okValue = cardData.value;
+        if (okValue.type === 'some' && okValue.value) {
+          const someValue = okValue.value;
+          if (someValue.type && someValue.type.includes('optional') && someValue.value) {
+            const optionalValue = someValue.value;
+            if (optionalValue.type && optionalValue.type.includes('tuple') && optionalValue.value) {
+              tupleData = optionalValue.value;
+            } else {
+              tupleData = optionalValue.value || optionalValue;
+            }
+          } else if (someValue.type && someValue.type.includes('tuple') && someValue.value) {
+            tupleData = someValue.value;
+          } else {
+            tupleData = someValue.value?.value || someValue.value || someValue;
+          }
+        }
+      }
+      
+      if (tupleData) {
+        let actualData = tupleData;
+        if (tupleData.value && tupleData.value.value && typeof tupleData.value.value === 'object') {
+          actualData = tupleData.value.value;
+        } else if (tupleData.value && typeof tupleData.value === 'object') {
+          if ('location' in tupleData.value || 'monthly-rent' in tupleData.value || 'valuation' in tupleData.value) {
+            actualData = tupleData.value;
+          } else if (tupleData.value.value) {
+            actualData = tupleData.value.value;
+          }
+        }
+        
+        const locationField = actualData.location || actualData['location'];
+        if (locationField) {
+          if (typeof locationField === 'string') {
+            location = locationField;
+          } else if (locationField.value !== undefined) {
+            location = String(locationField.value);
+          }
+        }
+        
+        const valuationField = actualData.valuation || actualData['valuation'];
+        if (valuationField) {
+          if (typeof valuationField === 'string' || typeof valuationField === 'number') {
+            valuation = BigInt(valuationField);
+          } else if (valuationField.value !== undefined) {
+            valuation = BigInt(valuationField.value);
+          }
+        }
+      }
+      
+      return { location: location || `Property #${propertyId}`, valuation: valuation || BigInt(0) };
+    }, [cardData, propertyId]);
+    
     return (
-      <main className="flex-1 bg-gray-50 relative pattern-dots">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-          <div className="mb-8">
-            <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Property Overview</h1>
-            <p className="text-gray-600 font-light text-lg">Create and manage tokenized properties</p>
-          </div>
-          <MintProperty onMinted={() => window.location.reload()} />
-        </div>
-      </main>
-    );
-  }
-
-  // If no property selected, show property list
-  if (!selectedPropertyId || !property) {
-    return (
-      <main className="flex-1 bg-gray-50 relative pattern-dots">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-          <div className="mb-8">
-            <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Properties</h1>
-            <p className="text-gray-600 font-light text-lg">Select a property to view details</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {propertyIds.map((id) => (
-              <Card key={id.toString()} className="cursor-pointer hover:border-primary transition-colors" onClick={() => setSelectedPropertyId(id)}>
-                <CardHeader>
-                  <CardTitle>Property #{id.toString()}</CardTitle>
-                  <CardDescription>Click to view details</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <main className="flex-1 bg-gray-50 relative pattern-dots">
-      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary/10 to-[#06B6D4]/10 rounded-full blur-3xl"></div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        <div className="mb-8">
-          <div className="flex justify-between items-start">
-            <div>
-          <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Property Overview</h1>
-          <p className="text-gray-600 font-light text-lg">Detailed view of your tokenized property</p>
+      <Card 
+        className="cursor-pointer hover:border-primary hover:shadow-lg transition-all h-full"
+        onClick={() => handlePropertyClick(propertyId)}
+      >
+        <CardHeader>
+          <CardTitle className="text-lg">{cardInfo?.location || `Property #${propertyId}`}</CardTitle>
+          <CardDescription>ID: {propertyId.toString()}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {cardInfo && cardInfo.valuation > BigInt(0) && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-500">Valuation</p>
+              <p className="text-xl font-semibold text-primary">
+                {(Number(cardInfo.valuation) / 1e6).toFixed(2)} USDCx
+              </p>
             </div>
-            {propertyIds.length > 1 && (
+          )}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <p className="text-xs text-gray-500">Click to view details</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show mint form view
+  if (viewMode === 'mint') {
+    return (
+      <main className="flex-1 bg-gray-50 relative pattern-dots">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+          <div className="mb-8">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Mint New Property</h1>
+                <p className="text-gray-600 font-light text-lg">Create a new tokenized property on Stacks</p>
+              </div>
+              <Button variant="outline" onClick={handleBackToCards}>
+                ← Back to Properties
+              </Button>
+            </div>
+          </div>
+          <MintProperty onMinted={handleMinted} />
+        </div>
+      </main>
+    );
+  }
+
+  // Show details view
+  if (viewMode === 'details' && selectedPropertyId && property) {
+    return (
+      <main className="flex-1 bg-gray-50 relative pattern-dots">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary/10 to-[#06B6D4]/10 rounded-full blur-3xl"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+          <div className="mb-8">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Property Details</h1>
+                <p className="text-gray-600 font-light text-lg">Detailed view of your tokenized property</p>
+              </div>
               <div className="flex gap-2">
-                <select
-                  value={selectedPropertyId.toString()}
-                  onChange={(e) => setSelectedPropertyId(BigInt(e.target.value))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                >
-                  {propertyIds.map((id) => (
-                    <option key={id.toString()} value={id.toString()}>
-                      Property #{id.toString()}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Property Header */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="text-2xl">{property.location}</CardTitle>
-            <CardDescription>
-              Property ID: {property.propertyId}
-              {property.owner && typeof property.owner === 'string' && property.owner.length > 0 && (
-                ` • Owner: ${property.owner.slice(0, 6)}...${property.owner.slice(-4)}`
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Valuation</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {property.valuation > BigInt(0) 
-                    ? `${(Number(property.valuation) / 1e6).toFixed(2)} USDCx`
-                    : "N/A"}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Monthly Rent</p>
-                <p className="text-2xl font-bold text-primary">
-                  {property.monthlyRent > BigInt(0)
-                    ? `${(Number(property.monthlyRent) / 1e6).toFixed(6)} USDCx`
-                    : "0 USDCx"}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Annual Yield</p>
-                <p className="text-2xl font-bold text-primary">
-                  {property.valuation > BigInt(0) && property.monthlyRent > BigInt(0)
-                    ? ((Number(property.monthlyRent) * 12 / Number(property.valuation)) * 100).toFixed(2)
-                    : "0"}%
-                </p>
+                <Button variant="outline" onClick={handleBackToCards}>
+                  ← Back to Properties
+                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Property Header */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="text-2xl">{property.location}</CardTitle>
+              <CardDescription>
+                Property ID: {property.propertyId}
+                {property.owner && typeof property.owner === 'string' && property.owner.length > 0 && (
+                  ` • Owner: ${property.owner.slice(0, 6)}...${property.owner.slice(-4)}`
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Valuation</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {property.valuation > BigInt(0) 
+                      ? `${(Number(property.valuation) / 1e6).toFixed(2)} USDCx`
+                      : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Monthly Rent</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {property.monthlyRent > BigInt(0)
+                      ? `${(Number(property.monthlyRent) / 1e6).toFixed(6)} USDCx`
+                      : "0 USDCx"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Annual Yield</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {property.valuation > BigInt(0) && property.monthlyRent > BigInt(0)
+                      ? ((Number(property.monthlyRent) * 12 / Number(property.valuation)) * 100).toFixed(2)
+                      : "0"}%
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
         {/* Cash Flow Summary */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -506,6 +594,47 @@ export default function PropertyPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
+    </main>
+    );
+  }
+
+  // Default: Show property cards view
+  return (
+    <main className="flex-1 bg-gray-50 relative pattern-dots">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+        <div className="mb-8">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-light text-foreground mb-3 tracking-tight">Properties</h1>
+              <p className="text-gray-600 font-light text-lg">Manage your tokenized properties</p>
+            </div>
+            <Button variant="primary" onClick={handleMintClick}>
+              + Mint Property
+            </Button>
+          </div>
+        </div>
+
+        {propertyIds.length === 0 ? (
+          <Card className="border-2 border-dashed border-primary/30">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <p className="text-sm text-gray-600 mb-4">
+                  No properties found. Mint your first property to get started.
+                </p>
+                <Button variant="primary" onClick={handleMintClick}>
+                  Mint New Property
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {propertyIds.map((id) => (
+              <PropertyCard key={id.toString()} propertyId={id} />
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );
