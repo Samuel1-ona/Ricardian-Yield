@@ -1,22 +1,23 @@
-import { useState, useEffect, useMemo } from "react";
-import { useAccount } from "wagmi";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { formatCurrency, formatAddress } from "@/lib/utils";
+import { formatAddress } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
-import { useCreateCapExProposal, useApproveProposal } from "@/hooks/useContractWrite";
-import { useProposalCount, useProposal, useIsProposalApproved } from "@/hooks/useDAO";
+import { useStacks } from "@/hooks/useStacks";
+import { useCreateCapExProposalWallet, useVoteProposalWallet } from "@/hooks/useStacksWriteWallet";
+import { useProposalCount, useProposal, useIsProposalApproved } from "@/hooks/useStacksRead";
 
 export default function DAOPage() {
-  const { isConnected } = useAccount();
+  const { isConnected, connect } = useStacks();
   const mounted = useMounted();
+  const [propertyId] = useState(BigInt(1)); // TODO: Get from context or props
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   
   // Contract hooks
-  const { createProposal, isPending: isCreating, isConfirming: isCreatingConfirming, isConfirmed: isCreated } = useCreateCapExProposal();
-  const { approveProposal, isPending: isApproving, isConfirming: isApprovingConfirming, isConfirmed: isApproved } = useApproveProposal();
+  const { createProposal, isPending: isCreating } = useCreateCapExProposalWallet();
+  const { voteFor, isPending: isVoting } = useVoteProposalWallet();
   const { proposalCount } = useProposalCount();
 
   // Fetch all proposals
@@ -26,21 +27,6 @@ export default function DAOPage() {
     return Array.from({ length: count }, (_, i) => BigInt(i));
   }, [proposalCount]);
 
-  // Handle successful proposal creation
-  useEffect(() => {
-    if (isCreated) {
-      toast.success("Proposal created successfully!");
-      setAmount("");
-      setDescription("");
-    }
-  }, [isCreated]);
-
-  // Handle successful proposal approval
-  useEffect(() => {
-    if (isApproved) {
-      toast.success("Proposal approved!");
-    }
-  }, [isApproved]);
 
   const handleCreateProposal = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -59,24 +45,26 @@ export default function DAOPage() {
     }
 
     try {
-      await createProposal(amount, description);
+      await createProposal(propertyId, amount, description);
+      setAmount("");
+      setDescription("");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to create proposal");
       console.error(error);
+      // Error is already handled by the hook
     }
   };
 
-  const handleApproveProposal = async (proposalId: bigint) => {
+  const handleVoteProposal = async (proposalId: bigint) => {
     if (!isConnected) {
       toast.error("Please connect your wallet");
       return;
     }
 
     try {
-      await approveProposal(proposalId);
+      await voteFor(propertyId, proposalId);
     } catch (error: any) {
-      toast.error(error?.message || "Failed to approve proposal");
       console.error(error);
+      // Error is already handled by the hook
     }
   };
 
@@ -102,6 +90,11 @@ export default function DAOPage() {
               <CardTitle>Connect Your Wallet</CardTitle>
               <CardDescription>Please connect your wallet to participate in governance</CardDescription>
             </CardHeader>
+            <CardContent>
+              <Button onClick={connect} variant="primary" className="w-full">
+                Connect Stacks Wallet
+              </Button>
+            </CardContent>
           </Card>
         </div>
       </main>
@@ -165,7 +158,7 @@ export default function DAOPage() {
             <CardContent className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Amount (USDC)
+                  Amount (USDCx)
                 </label>
                 <input
                   type="number"
@@ -198,9 +191,9 @@ export default function DAOPage() {
                 variant="primary"
                 className="w-full"
                 onClick={handleCreateProposal}
-                isLoading={isCreating || isCreatingConfirming}
+                isLoading={isCreating}
               >
-                {isCreating || isCreatingConfirming ? "Creating..." : "Create Proposal"}
+                {isCreating ? "Creating..." : "Create Proposal"}
               </Button>
             </CardContent>
           </Card>
@@ -226,8 +219,9 @@ export default function DAOPage() {
                     <ProposalItem 
                       key={proposalId.toString()} 
                       proposalId={proposalId}
-                      onApprove={handleApproveProposal}
-                      isApproving={isApproving || isApprovingConfirming}
+                      propertyId={propertyId}
+                      onVote={handleVoteProposal}
+                      isVoting={isVoting}
                     />
                   ))
                 )}
@@ -242,16 +236,18 @@ export default function DAOPage() {
 
 // Component to display a single proposal
 function ProposalItem({ 
-  proposalId, 
-  onApprove,
-  isApproving 
+  proposalId,
+  propertyId,
+  onVote,
+  isVoting 
 }: { 
   proposalId: bigint;
-  onApprove: (id: bigint) => void;
-  isApproving: boolean;
+  propertyId: bigint;
+  onVote: (id: bigint) => void;
+  isVoting: boolean;
 }) {
-  const { proposal, isLoading } = useProposal(proposalId);
-  const { isApproved } = useIsProposalApproved(proposalId);
+  const { proposal, isLoading } = useProposal(propertyId, proposalId);
+  const { isApproved } = useIsProposalApproved(propertyId, proposalId);
 
   if (isLoading) {
     return (
@@ -294,7 +290,7 @@ function ProposalItem({
         </div>
         <div className="text-right">
           <p className="font-semibold text-primary text-lg">
-            {formatCurrency(proposal.amount)}
+            {proposal.amount ? `${(Number(proposal.amount) / 1e6).toFixed(6)} USDCx` : "0 USDCx"}
           </p>
         </div>
       </div>
@@ -303,10 +299,10 @@ function ProposalItem({
           variant="outline"
           size="sm"
           className="w-full mt-3"
-          onClick={() => onApprove(proposalId)}
-          isLoading={isApproving}
+          onClick={() => onVote(proposalId)}
+          isLoading={isVoting}
         >
-          {isApproving ? "Approving..." : "Approve Proposal"}
+          {isVoting ? "Voting..." : "Vote For Proposal"}
         </Button>
       )}
     </div>

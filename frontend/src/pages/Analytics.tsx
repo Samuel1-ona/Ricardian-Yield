@@ -1,14 +1,15 @@
 import { Suspense, lazy } from "react";
-import { useAccount } from "wagmi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { useMounted } from "@/hooks/useMounted";
+import { useStacks } from "@/hooks/useStacks";
 
 // Lazy load heavy chart components for faster initial render
 const CashFlowChart = lazy(() => import("@/components/charts/CashFlowChart").then(m => ({ default: m.CashFlowChart })));
 const YieldChart = lazy(() => import("@/components/charts/YieldChart").then(m => ({ default: m.YieldChart })));
 
 export default function AnalyticsPage() {
-  const { isConnected } = useAccount();
+  const { isConnected, connect } = useStacks();
   const mounted = useMounted();
 
   // Mock chart data
@@ -50,6 +51,11 @@ export default function AnalyticsPage() {
               <CardTitle>Connect Your Wallet</CardTitle>
               <CardDescription>Please connect your wallet to view analytics</CardDescription>
             </CardHeader>
+            <CardContent>
+              <Button onClick={connect} variant="primary" className="w-full">
+                Connect Stacks Wallet
+              </Button>
+            </CardContent>
           </Card>
         </div>
       </main>

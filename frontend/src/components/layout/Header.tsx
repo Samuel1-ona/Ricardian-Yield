@@ -2,12 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { formatAddress } from "@/lib/utils";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useStacks } from "@/hooks/useStacks";
 
 export const Header: React.FC = React.memo(() => {
-  const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
+  const { address, isConnected, connect, disconnect } = useStacks();
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -76,14 +74,10 @@ export const Header: React.FC = React.memo(() => {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => {
-                  if (connectors.length > 0) {
-                    connect({ connector: connectors[0] });
-                  }
-                }}
-                disabled={!mounted || connectors.length === 0}
+                onClick={() => connect()}
+                disabled={!mounted}
               >
-                Connect
+                Connect Wallet
               </Button>
             )}
 

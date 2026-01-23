@@ -1,21 +1,22 @@
-import { useState, useEffect, useMemo } from "react";
-import { useAccount } from "wagmi";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { formatCurrency, formatAddress } from "@/lib/utils";
+import { formatAddress } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
-import { useCreateCapExProposal } from "@/hooks/useContractWrite";
-import { useProposalCount, useProposal, useIsProposalApproved } from "@/hooks/useDAO";
+import { useStacks } from "@/hooks/useStacks";
+import { useCreateCapExProposalWallet } from "@/hooks/useStacksWriteWallet";
+import { useProposalCount, useProposal, useIsProposalApproved } from "@/hooks/useStacksRead";
 
 export default function CapExPage() {
-  const { isConnected } = useAccount();
+  const { isConnected, connect } = useStacks();
   const mounted = useMounted();
+  const [propertyId] = useState(BigInt(1)); // TODO: Get from context or props
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   
   // Contract hooks
-  const { createProposal, isPending: isCreating, isConfirming, isConfirmed } = useCreateCapExProposal();
+  const { createProposal, isPending: isCreating } = useCreateCapExProposalWallet();
   const { proposalCount } = useProposalCount();
 
   // Fetch all proposals
@@ -25,14 +26,6 @@ export default function CapExPage() {
     return Array.from({ length: count }, (_, i) => BigInt(i));
   }, [proposalCount]);
 
-  // Handle successful proposal creation
-  useEffect(() => {
-    if (isConfirmed) {
-      toast.success("CapEx proposal created successfully!");
-      setAmount("");
-      setDescription("");
-    }
-  }, [isConfirmed]);
 
   const handleCreateProposal = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -51,10 +44,12 @@ export default function CapExPage() {
     }
 
     try {
-      await createProposal(amount, description);
+      await createProposal(propertyId, amount, description);
+      setAmount("");
+      setDescription("");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to create proposal");
       console.error(error);
+      // Error is already handled by the hook
     }
   };
 
@@ -80,6 +75,11 @@ export default function CapExPage() {
               <CardTitle>Connect Your Wallet</CardTitle>
               <CardDescription>Please connect your wallet to manage CapEx proposals</CardDescription>
             </CardHeader>
+            <CardContent>
+              <Button onClick={connect} variant="primary" className="w-full">
+                Connect Stacks Wallet
+              </Button>
+            </CardContent>
           </Card>
         </div>
       </main>
@@ -104,9 +104,9 @@ export default function CapExPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amount (USDC)
-              </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount (USDCx)
+                </label>
               <input
                 type="number"
                 step="0.01"
@@ -138,9 +138,9 @@ export default function CapExPage() {
               variant="primary"
               className="w-full"
               onClick={handleCreateProposal}
-              isLoading={isCreating || isConfirming}
+              isLoading={isCreating}
             >
-              {isCreating || isConfirming ? "Creating..." : "Create Proposal"}
+              {isCreating ? "Creating..." : "Create Proposal"}
             </Button>
           </CardContent>
         </Card>
@@ -176,8 +176,9 @@ export default function CapExPage() {
 
 // Component to display a single proposal
 function ProposalItem({ proposalId }: { proposalId: bigint }) {
-  const { proposal, isLoading } = useProposal(proposalId);
-  const { isApproved } = useIsProposalApproved(proposalId);
+  const [propertyId] = useState(BigInt(1)); // TODO: Get from context
+  const { proposal, isLoading } = useProposal(propertyId, proposalId);
+  const { isApproved } = useIsProposalApproved(propertyId, proposalId);
 
   if (isLoading) {
     return (
@@ -220,7 +221,7 @@ function ProposalItem({ proposalId }: { proposalId: bigint }) {
         </div>
         <div className="text-right ml-4">
           <p className="text-2xl font-bold text-foreground">
-            {formatCurrency(proposal.amount)}
+            {proposal.amount ? `${(Number(proposal.amount) / 1e6).toFixed(6)} USDCx` : "0 USDCx"}
           </p>
         </div>
       </div>

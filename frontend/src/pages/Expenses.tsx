@@ -1,37 +1,28 @@
-import { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { formatCurrency } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
-import { useRecordOperatingExpense } from "@/hooks/useContractWrite";
+import { useStacks } from "@/hooks/useStacks";
+import { useRecordOperatingExpenseWallet } from "@/hooks/useStacksWriteWallet";
 import { 
   useOperatingExpenses, 
   useWorkingCapitalReserve,
   useCurrentPeriod 
-} from "@/hooks/useCashFlow";
+} from "@/hooks/useStacksRead";
 
 export default function ExpensesPage() {
-  const { isConnected } = useAccount();
+  const { isConnected, connect } = useStacks();
   const mounted = useMounted();
+  const [propertyId] = useState(BigInt(1)); // TODO: Get from context or props
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   
   // Contract hooks
-  const { recordExpense, isPending: isRecording, isConfirming, isConfirmed } = useRecordOperatingExpense();
-  const { operatingExpenses } = useOperatingExpenses();
-  const { workingCapitalReserve } = useWorkingCapitalReserve();
-  const { currentPeriod } = useCurrentPeriod();
-
-  // Handle successful expense recording
-  useEffect(() => {
-    if (isConfirmed) {
-      toast.success("Expense recorded successfully!");
-      setAmount("");
-      setDescription("");
-    }
-  }, [isConfirmed]);
+  const { recordExpense, isPending: isRecording } = useRecordOperatingExpenseWallet();
+  const { operatingExpenses } = useOperatingExpenses(propertyId);
+  const { workingCapitalReserve } = useWorkingCapitalReserve(propertyId);
+  const { currentPeriod } = useCurrentPeriod(propertyId);
 
   const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -50,10 +41,12 @@ export default function ExpensesPage() {
     }
 
     try {
-      await recordExpense(amount);
+      await recordExpense(propertyId, amount);
+      setAmount("");
+      setDescription("");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to record expense");
       console.error(error);
+      // Error is already handled by the hook
     }
   };
 
@@ -79,6 +72,11 @@ export default function ExpensesPage() {
               <CardTitle>Connect Your Wallet</CardTitle>
               <CardDescription>Please connect your wallet to record expenses</CardDescription>
             </CardHeader>
+            <CardContent>
+              <Button onClick={connect} variant="primary" className="w-full">
+                Connect Stacks Wallet
+              </Button>
+            </CardContent>
           </Card>
         </div>
       </main>
@@ -103,7 +101,7 @@ export default function ExpensesPage() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-red-500">
-                {operatingExpenses ? formatCurrency(operatingExpenses as bigint) : "0 USDC"}
+                {operatingExpenses ? `${(Number(operatingExpenses) / 1e6).toFixed(6)} USDCx` : "0 USDCx"}
               </p>
             </CardContent>
           </Card>
@@ -115,7 +113,7 @@ export default function ExpensesPage() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-foreground">
-                {workingCapitalReserve ? formatCurrency(workingCapitalReserve as bigint) : "0 USDC"}
+                {workingCapitalReserve ? `${(Number(workingCapitalReserve) / 1e6).toFixed(6)} USDCx` : "0 USDCx"}
               </p>
             </CardContent>
           </Card>
@@ -143,7 +141,7 @@ export default function ExpensesPage() {
             <CardContent className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Amount (USDC)
+                  Amount (USDCx)
                 </label>
                 <input
                   type="number"
@@ -170,9 +168,9 @@ export default function ExpensesPage() {
                 variant="primary"
                 className="w-full"
                 onClick={handleSubmit}
-                isLoading={isRecording || isConfirming}
+                isLoading={isRecording}
               >
-                {isRecording || isConfirming ? "Recording..." : "Record Expense"}
+                {isRecording ? "Recording..." : "Record Expense"}
               </Button>
             </CardContent>
           </Card>
@@ -201,7 +199,7 @@ export default function ExpensesPage() {
                         </p>
                       </div>
                       <p className="font-semibold text-red-500">
-                        {formatCurrency(operatingExpenses as bigint)}
+                        {operatingExpenses ? `${(Number(operatingExpenses) / 1e6).toFixed(6)} USDCx` : "0 USDCx"}
                       </p>
                     </div>
                   </div>

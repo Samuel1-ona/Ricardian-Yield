@@ -1,33 +1,26 @@
-import { useEffect, useMemo } from "react";
-import { useAccount } from "wagmi";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { formatCurrency } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useMounted } from "@/hooks/useMounted";
-import { useClaimYield } from "@/hooks/useContractWrite";
+import { useStacks } from "@/hooks/useStacks";
+import { useClaimYieldWallet } from "@/hooks/useStacksWriteWallet";
 import { 
   useClaimableYield, 
   useCurrentDistributionPeriod,
-  useTotalDistributablePerPeriod 
-} from "@/hooks/useYield";
-import { useYieldEarned } from "@/hooks/useYield";
+} from "@/hooks/useStacksRead";
 
 export default function YieldPage() {
-  const { isConnected } = useAccount();
+  const { isConnected, connect } = useStacks();
   const mounted = useMounted();
-  const { claimYield, isPending: isClaiming, isConfirming, isConfirmed } = useClaimYield();
-  const { currentPeriod } = useCurrentDistributionPeriod();
-  const { yieldEarned } = useYieldEarned();
+  const [propertyId] = useState(BigInt(1)); // TODO: Get from context or props
+  const { claimYield, isPending: isClaiming } = useClaimYieldWallet();
+  const { currentPeriod } = useCurrentDistributionPeriod(propertyId);
 
   // Fetch claimable yield for current period
   const { claimableYield: currentClaimable } = useClaimableYield(
+    propertyId,
     currentPeriod !== undefined && currentPeriod !== null ? currentPeriod : undefined
-  );
-  
-  // Fetch total distributable for current period
-  const { totalDistributable: currentTotal } = useTotalDistributablePerPeriod(
-    currentPeriod !== undefined && currentPeriod !== null ? currentPeriod : BigInt(0)
   );
 
   // For simplicity, show current period data
@@ -36,27 +29,19 @@ export default function YieldPage() {
     if (!currentPeriod || currentPeriod === null) return [];
     
     const claimable = (currentClaimable as bigint | undefined) || BigInt(0);
-    const total = (currentTotal as bigint | undefined) || BigInt(0);
     
     return [{
       period: Number(currentPeriod),
       claimable,
-      totalDistributable: total,
-      claimed: claimable === BigInt(0) && total > BigInt(0),
+      totalDistributable: BigInt(0), // TODO: Fetch from contract if needed
+      claimed: claimable === BigInt(0),
     }];
-  }, [currentPeriod, currentClaimable, currentTotal]);
+  }, [currentPeriod, currentClaimable]);
 
   // Calculate total claimable across all periods
   const totalClaimable = useMemo(() => {
     return periodData.reduce((sum, p) => sum + p.claimable, BigInt(0));
   }, [periodData]);
-
-  // Handle successful claim
-  useEffect(() => {
-    if (isConfirmed) {
-      toast.success("Yield claimed successfully!");
-    }
-  }, [isConfirmed]);
 
   const handleClaim = async (period: number) => {
     if (!isConnected) {
@@ -65,10 +50,10 @@ export default function YieldPage() {
     }
 
     try {
-      await claimYield(BigInt(period));
+      await claimYield(propertyId, BigInt(period));
     } catch (error: any) {
-      toast.error(error?.message || "Failed to claim yield");
       console.error(error);
+      // Error is already handled by the hook
     }
   };
 
@@ -94,6 +79,11 @@ export default function YieldPage() {
               <CardTitle>Connect Your Wallet</CardTitle>
               <CardDescription>Please connect your wallet to view and claim yield</CardDescription>
             </CardHeader>
+            <CardContent>
+              <Button onClick={connect} variant="primary" className="w-full">
+                Connect Stacks Wallet
+              </Button>
+            </CardContent>
           </Card>
         </div>
       </main>
@@ -118,13 +108,10 @@ export default function YieldPage() {
           </CardHeader>
           <CardContent className="relative z-10">
             <p className="text-4xl font-light text-primary tracking-tight">
-              {formatCurrency(totalClaimable)}
+              {totalClaimable > BigInt(0) 
+                ? `${(Number(totalClaimable) / 1e6).toFixed(6)} USDCx`
+                : "0 USDCx"}
             </p>
-            {(yieldEarned as bigint | undefined) && (yieldEarned as bigint) > BigInt(0) && (
-              <p className="text-sm text-gray-600 mt-2">
-                DeFi Yield Earned: {formatCurrency(yieldEarned as bigint)}
-              </p>
-            )}
           </CardContent>
         </Card>
 
@@ -154,9 +141,9 @@ export default function YieldPage() {
                       <Button
                         variant="primary"
                         onClick={() => handleClaim(pd.period)}
-                        isLoading={isClaiming || isConfirming}
+                        isLoading={isClaiming}
                       >
-                        {isClaiming || isConfirming ? "Claiming..." : "Claim Yield"}
+                        {isClaiming ? "Claiming..." : "Claim Yield"}
                       </Button>
                     )}
                   </div>
@@ -164,15 +151,11 @@ export default function YieldPage() {
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <p className="text-sm text-gray-500 mb-1">Total Distributable</p>
-                      <p className="text-lg font-semibold text-foreground">
-                        {formatCurrency(pd.totalDistributable as bigint)}
-                      </p>
-                    </div>
-                    <div>
                       <p className="text-sm text-gray-500 mb-1">Your Claimable</p>
                       <p className="text-lg font-semibold text-primary">
-                        {formatCurrency(pd.claimable as bigint)}
+                        {(pd.claimable as bigint) > BigInt(0)
+                          ? `${(Number(pd.claimable) / 1e6).toFixed(6)} USDCx`
+                          : "0 USDCx"}
                       </p>
                     </div>
                     <div>

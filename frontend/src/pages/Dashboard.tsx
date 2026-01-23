@@ -1,22 +1,29 @@
-import { useAccount } from "wagmi";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Link } from "react-router-dom";
-import { formatCurrency } from "@/lib/utils";
 import { useMounted } from "@/hooks/useMounted";
+import { useStacks } from "@/hooks/useStacks";
+import { useRentCollected, useDistributableCashFlow, useCurrentPeriod } from "@/hooks/useStacksRead";
 
 export default function DashboardPage() {
-  const { isConnected } = useAccount();
+  const { isConnected, connect } = useStacks();
+  const [propertyId] = useState(BigInt(1)); // TODO: Get from context or props
   const mounted = useMounted();
 
-  // Mock data - will be replaced with actual contract calls
+  // Get actual data from contracts
+  const { rentCollected } = useRentCollected(propertyId);
+  const { distributableCashFlow } = useDistributableCashFlow(propertyId);
+  const { currentPeriod } = useCurrentPeriod(propertyId);
+
+  // Format metrics (USDCx has 6 decimals)
   const metrics = {
-    totalRentCollected: BigInt(50000) * BigInt(10) ** BigInt(18),
-    distributableCashFlow: BigInt(35000) * BigInt(10) ** BigInt(18),
-    defiYieldEarned: BigInt(2500) * BigInt(10) ** BigInt(18),
-    totalAssetsInVault: BigInt(15000) * BigInt(10) ** BigInt(18),
-    currentPeriod: 3,
+    totalRentCollected: rentCollected || BigInt(0),
+    distributableCashFlow: distributableCashFlow || BigInt(0),
+    defiYieldEarned: BigInt(0), // Removed yield stacking
+    totalAssetsInVault: BigInt(0), // Removed yield stacking
+    currentPeriod: currentPeriod ? Number(currentPeriod) : 0,
   };
 
   // Show loading state during hydration
@@ -45,9 +52,9 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-500">
-                Use the "Connect Wallet" button in the header to get started.
-              </p>
+              <Button onClick={connect} variant="primary" className="w-full">
+                Connect Stacks Wallet
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -176,25 +183,12 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium text-primary text-sm">{formatCurrency(BigInt(10000) * BigInt(10) ** BigInt(18))}</p>
-                  <p className="text-xs text-gray-500 font-light">2 hours ago</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between py-4 px-2 rounded-lg hover:bg-gray-50 transition-material">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground text-sm">Yield Claimed</p>
-                    <p className="text-xs text-gray-500 font-light">Period {metrics.currentPeriod - 1}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium text-primary text-sm">{formatCurrency(BigInt(5000) * BigInt(10) ** BigInt(18))}</p>
-                  <p className="text-xs text-gray-500 font-light">1 day ago</p>
+                  <p className="font-medium text-primary text-sm">
+                    {metrics.totalRentCollected > BigInt(0) 
+                      ? `${(Number(metrics.totalRentCollected) / 1e6).toFixed(6)} USDCx`
+                      : "0 USDCx"}
+                  </p>
+                  <p className="text-xs text-gray-500 font-light">Current period</p>
                 </div>
               </div>
             </div>
